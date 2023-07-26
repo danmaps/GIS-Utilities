@@ -73,8 +73,9 @@ def main():
             hftd, label = key
             summary += f"OIDs {', '.join(map(str,oids))} have HFTDClass of {hftd} but LABEL is {label}\n"
         
-        arcpy.AddMessage(summary)
+        arcpy.AddError(summary)
         return
+    arcpy.AddMessage("Pass!")
 
 if __name__ == "__main__":
     main()
