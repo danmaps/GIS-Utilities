@@ -23,15 +23,17 @@ def main():
 
     arcpy.AddMessage(f"Created {lyr}_SpatialJoin")
 
+    arcpy.MakeFeatureLayer_management(f"{lyr}_SpatialJoin",f"{lyr}_SpatialJoinLayer")
+
     arcpy.AddMessage(f"Select By Attributes")
     arcpy.management.SelectLayerByAttribute(
-        in_layer_or_view=f"{lyr}_SpatialJoin",
+        in_layer_or_view=f"{lyr}_SpatialJoinLayer",
         selection_type="NEW_SELECTION",
-        where_clause="HFTDClass <> 'Non-HFTD' AND (LABEL IS NULL OR LABEL = '')",
+        where_clause="(HFTDClass <> LABEL And LABEL IS NOT NULL) OR (HFTDClass <> 'Non-HFTD' AND LABEL IS NULL)",
     )
 
     # Get the count of selected features
-    count = int(arcpy.GetCount_management(f"{lyr}_SpatialJoin")[0])
+    count = int(arcpy.GetCount_management(f"{lyr}_SpatialJoinLayer")[0])
     arcpy.AddMessage(f"{lyr}_SpatialJoin feature count: {count}")
 
     # Check if there are problematic situations, and indicate failure with AddError
