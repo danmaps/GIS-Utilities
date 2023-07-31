@@ -55,6 +55,7 @@ def main():
         
         arcpy.AddMessage(table)
 
+        # Create readable summary
         mismatch_oids = {}
 
         for i in range(len(objectids)):
