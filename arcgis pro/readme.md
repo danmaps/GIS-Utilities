@@ -49,3 +49,7 @@ if __name__ == "__main__":
   
   main(feature, request_table, join_field, output, dissolve_fields)
   ```
+
+  validation needed: https://pro.arcgis.com/en/pro-app/latest/arcpy/geoprocessing_and_python/understanding-validation-in-script-tools.htm
+
+  
