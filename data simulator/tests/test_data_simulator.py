@@ -10,11 +10,11 @@ TEST_CSV_LATLONG = "test_data_latlong.csv"
 
 def test_numeric_fields():
     # Generate anonymized CSV
-    anonymize_gis_data(TEST_CSV_1, 3, "anonymized_test_data_1.csv")
+    anonymize_gis_data(TEST_CSV_NUMERIC, 3, "anonymized_test_data_numeric.csv")
 
     # Read original and anonymized data
-    df_original = pd.read_csv(TEST_CSV_1)
-    df_anonymized = pd.read_csv("anonymized_test_data_1.csv")
+    df_original = pd.read_csv(TEST_CSV_NUMERIC)
+    df_anonymized = pd.read_csv("anonymized_test_data_numeric.csv")
 
     # Check if columns are preserved and values are anonymized
     assert set(df_original.columns) == set(df_anonymized.columns)
@@ -22,6 +22,14 @@ def test_numeric_fields():
         if field != 'OID':  # Exclude ID field
             assert df_original[field].nunique() == df_anonymized[field].nunique()
             assert not df_original[field].equals(df_anonymized[field])
+
+            # Check if data type and number of digits are preserved for numeric fields
+            if field == 'IntegerField':
+                assert df_anonymized[field].dtype == 'int64'
+            elif field == 'FloatField':
+                assert df_anonymized[field].dtype == 'float64'
+                assert df_original[field].apply(lambda x: len(str(x).split(".")[1]) if pd.notnull(x) else 0).equals(
+                    df_anonymized[field].apply(lambda x: len(str(x).split(".")[1]) if pd.notnull(x) else 0))
 
 def test_string_fields():
     # Generate anonymized CSV

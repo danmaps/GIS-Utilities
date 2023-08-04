@@ -36,23 +36,22 @@ def anonymize_gis_data(input_data, count, output_csv):
 
         # Handle numeric fields
         elif field_info.type in ['Integer', 'Double', 'Float']:
-            min_val, max_val = df[field].min(), df[field].max()
-            df[field] = [random.uniform(min_val, max_val) if pd.notnull(val) else None for val in df[field]]
+            df[field] = anonymize_numeric(df[field], field_info.type)
 
         # Handle date fields
         elif field_info.type == 'Date':
             date_format = "%m/%d/%Y %I:%M:%S %p"
             df[field] = [anonymize_date(val, date_format) if pd.notnull(val) else None for val in df[field]]
 
-    # Drop the "SHAPE" column from the DataFrame
-    if "SHAPE" in df.columns:
-        df.drop(columns=["SHAPE"], inplace=True)
-    
     # Create a dictionary to map original field names to new field names
     field_mapping = {field: f"field{i}" for i, field in enumerate(df.columns, 1)}
 
     # Rename the columns of the DataFrame using the dictionary
     df.rename(columns=field_mapping, inplace=True)
+
+    # Drop the "SHAPE" column from the DataFrame
+    if "SHAPE" in df.columns:
+        df.drop(columns=["SHAPE"], inplace=True)
 
     # Export anonymized data to a CSV file
     df.to_csv(output_csv, index=False)
@@ -63,6 +62,17 @@ def anonymize_string(s):
         random.seed(hash(s))  # Ensure the same value gets the same random string
         return ''.join(random.choices(string.ascii_lowercase + string.digits, k=len(s)))
     return None
+
+def anonymize_numeric(values, field_type):
+    # Anonymize numeric values while preserving data type and number of digits (for floats)
+    if field_type in ['Double', 'Float']:
+        # Find the maximum number of digits after the decimal point in the original field
+        num_decimals = max(map(lambda x: len(str(x).split(".")[1]) if pd.notnull(x) else 0, values))
+        # Round the values to the same number of decimals
+        values = [round(val, num_decimals) if pd.notnull(val) else None for val in values]
+    else:  # For Integer fields, round to the nearest integer
+        values = [round(val) if pd.notnull(val) else None for val in values]
+    return values
 
 def anonymize_date(d, date_format):
     # Anonymize date by adding random time intervals within a year
