@@ -3,22 +3,19 @@ import pandas as pd
 import random
 import string
 
-def anonymize_gis_data(input_data, output_csv):
+def anonymize_gis_data(input_data, count, output_csv):
     try:
         # Get the number of rows in the input dataset
         num_rows = int(arcpy.GetCount_management(input_data).getOutput(0))
     except:
         arcpy.AddError("Invalid input dataset. Please provide a valid file geodatabase, feature service, or table.")
         return
+    print(num_rows)
 
     # Read data into a pandas DataFrame
     fields = [f.name for f in arcpy.ListFields(input_data)]
-    data = [row for row in arcpy.da.SearchCursor(input_data, fields)]
+    data = [row for row in arcpy.da.SearchCursor(input_data, fields)][:count]
     df = pd.DataFrame(data, columns=fields)
-
-    # Match the number of rows in the output dataset
-    if df.shape[0] < num_rows:
-        df = df.append([df.iloc[random.randint(0, df.shape[0] - 1)] for _ in range(num_rows - df.shape[0])], ignore_index=True)
 
     # Iterate through each field and anonymize the data
     for field in df.columns:
@@ -43,7 +40,8 @@ def anonymize_gis_data(input_data, output_csv):
 if __name__ == '__main__':
     # Get input and output datasets from script tool parameters
     input_dataset = arcpy.GetParameterAsText(0)
-    output_csv = arcpy.GetParameterAsText(1)
+    count = arcpy.GetParameterAsText(1)
+    output_csv = arcpy.GetParameterAsText(2)
 
     # Call the function to anonymize the GIS data
-    anonymize_gis_data(input_dataset, output_csv)
+    anonymize_gis_data(input_dataset, count, output_csv)
