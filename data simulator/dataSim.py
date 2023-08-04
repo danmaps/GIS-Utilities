@@ -104,7 +104,7 @@ def anonymize_date(d, date_format):
 if __name__ == '__main__':
     # Get input and output datasets from script tool parameters
     input_dataset = arcpy.GetParameterAsText(0)
-    count = int(arcpy.GetParameterAsText(1))
+    count = arcpy.GetParameter(1)
     output_csv = arcpy.GetParameterAsText(2)
 
     # Call the function to anonymize the GIS data
