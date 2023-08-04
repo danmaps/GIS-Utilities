@@ -7,3 +7,6 @@ To use this script as a script tool in ArcGIS Pro, follow these steps:
 - Save the script tool and run it by providing the input and output datasets.
 
 Now you have a script tool that can be used to anonymize GIS data and export the anonymized data to a CSV file, matching the number of rows in the input dataset.
+
+
+so for the string type fields, please preserve data patterns. Make up random strings to replace the data with but maintain the distribution. and for the number fields don't just plus or minus the values, i want you to notice if they are integers or floats, and then to replace them with numbers that make sense. here's my current code:
