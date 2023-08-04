@@ -6,6 +6,7 @@ from dataSim import anonymize_gis_data
 TEST_CSV_1 = "test_data_1.csv"
 TEST_CSV_2 = "test_data_2.csv"
 TEST_CSV_3 = "test_data_3.csv"
+TEST_CSV_NUMERIC = "test_data_numeric.csv"
 TEST_CSV_LATLONG = "test_data_latlong.csv"
 
 def test_numeric_fields():
