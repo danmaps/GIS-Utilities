@@ -2,25 +2,27 @@ import arcpy
 import pandas as pd
 import random
 import string
+import re
 from datetime import datetime, timedelta
 
 def anonymize_gis_data(input_data, count, output_csv):
-    try:
-        # Get the number of rows in the input dataset
-        num_rows = int(arcpy.GetCount_management(input_data).getOutput(0))
-    except:
-        arcpy.AddError("Invalid input dataset. Please provide a valid file geodatabase, feature service, or table.")
-        return
+    # try:
+    #     # Get the number of rows in the input dataset
+    #     num_rows = int(arcpy.GetCount_management(input_data).getOutput(0))
+    # except:
+    #     arcpy.AddError("Invalid input dataset. Please provide a valid file geodatabase, feature service, or table.")
+    #     return
 
     # Read data into a pandas DataFrame
     fields = [f.name for f in arcpy.ListFields(input_data)]
     data = [row for row in arcpy.da.SearchCursor(input_data, fields)][:count]
     df = pd.DataFrame(data, columns=fields)
 
+    # Extract maximum field lengths for text fields
+    field_lengths = {field: field_info.length for field, field_info in zip(fields, arcpy.ListFields(input_data))}
+    
     # Iterate through each field and anonymize the data
     for field in df.columns:
-        if field.upper() == "SHAPE":
-            continue  # Skip SHAPE fields
 
         field_info = arcpy.ListFields(input_data, field)[0]
 
@@ -31,8 +33,14 @@ def anonymize_gis_data(input_data, count, output_csv):
         # Handle string fields
         elif field_info.type == 'String':
             unique_values = df[field].unique()
-            word_list = [anonymize_string(val) if pd.notnull(val) else None for val in df[field]]
-            df[field] = word_list
+            max_length = field_lengths.get(field, 50)  # Default to a max length of 50 if not found
+
+            # Check if the field matches the FLOC format (e.g., "OH-######E")
+            if all(re.match(r'^[A-Z]{2}-\d+[A-Z]$', str(val)) for val in unique_values if pd.notnull(val)):
+                df[field] = [anonymize_floc(val) for val in df[field]]
+            else:
+                word_list = [anonymize_string(val, max_length) if pd.notnull(val) else None for val in df[field]]
+                df[field] = word_list
 
         # Handle numeric fields
         elif field_info.type in ['Integer', 'Double', 'Float']:
@@ -42,11 +50,11 @@ def anonymize_gis_data(input_data, count, output_csv):
         elif field_info.type == 'Date':
             date_format = "%m/%d/%Y %I:%M:%S %p"
             df[field] = [anonymize_date(val, date_format) if pd.notnull(val) else None for val in df[field]]
-
+    
     # Drop the "SHAPE" column from the DataFrame
     if "SHAPE" in df.columns:
         df.drop(columns=["SHAPE"], inplace=True)
-
+    
     # Create a dictionary to map original field names to new field names
     field_mapping = {field: f"field{i}" for i, field in enumerate(df.columns, 1)}
 
@@ -56,11 +64,20 @@ def anonymize_gis_data(input_data, count, output_csv):
     # Export anonymized data to a CSV file
     df.to_csv(output_csv, index=False)
 
-def anonymize_string(s):
+def anonymize_string(s, max_length):
     # Anonymize string by preserving case, length, and uniqueness
     if pd.notnull(s):
         random.seed(hash(s))  # Ensure the same value gets the same random string
-        return ''.join(random.choices(string.ascii_lowercase + string.digits, k=len(s)))
+        return ''.join(random.choices(string.ascii_lowercase + string.digits, k=min(len(s), max_length)))
+    return None
+
+def anonymize_floc(s):
+    # Anonymize FLOC field while preserving characters before the dash and anonymizing the numeric part
+    if pd.notnull(s):
+        floc_prefix, floc_suffix = s.split('-')
+        random.seed(hash(floc_suffix))  # Ensure the same value gets the same random string
+        anonymized_suffix = ''.join(random.choices(string.digits, k=len(floc_suffix)))
+        return f"{floc_prefix}-{anonymized_suffix}{floc_suffix[-1]}"  # Preserve the last character after the numeric part
     return None
 
 def anonymize_numeric(values, field_type):
