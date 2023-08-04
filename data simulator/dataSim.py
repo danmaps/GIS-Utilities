@@ -43,15 +43,15 @@ def anonymize_gis_data(input_data, count, output_csv):
             date_format = "%m/%d/%Y %I:%M:%S %p"
             df[field] = [anonymize_date(val, date_format) if pd.notnull(val) else None for val in df[field]]
 
+    # Drop the "SHAPE" column from the DataFrame
+    if "SHAPE" in df.columns:
+        df.drop(columns=["SHAPE"], inplace=True)
+
     # Create a dictionary to map original field names to new field names
     field_mapping = {field: f"field{i}" for i, field in enumerate(df.columns, 1)}
 
     # Rename the columns of the DataFrame using the dictionary
     df.rename(columns=field_mapping, inplace=True)
-
-    # Drop the "SHAPE" column from the DataFrame
-    if "SHAPE" in df.columns:
-        df.drop(columns=["SHAPE"], inplace=True)
 
     # Export anonymized data to a CSV file
     df.to_csv(output_csv, index=False)
