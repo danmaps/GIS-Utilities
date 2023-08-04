@@ -19,6 +19,9 @@ def anonymize_gis_data(input_data, count, output_csv):
 
     # Iterate through each field and anonymize the data
     for field in df.columns:
+        if field.upper() == "SHAPE":
+            continue  # Skip SHAPE fields
+
         field_info = arcpy.ListFields(input_data, field)[0]
 
         # Handle lat/long fields
@@ -41,6 +44,10 @@ def anonymize_gis_data(input_data, count, output_csv):
             date_format = "%m/%d/%Y %I:%M:%S %p"
             df[field] = [anonymize_date(val, date_format) if pd.notnull(val) else None for val in df[field]]
 
+    # Drop the "SHAPE" column from the DataFrame
+    if "SHAPE" in df.columns:
+        df.drop(columns=["SHAPE"], inplace=True)
+    
     # Create a dictionary to map original field names to new field names
     field_mapping = {field: f"field{i}" for i, field in enumerate(df.columns, 1)}
 
@@ -66,7 +73,6 @@ def anonymize_date(d, date_format):
         random_interval = timedelta(days=random.randint(0, 365), seconds=random.randint(0, 86400))  # 1 year maximum interval
         return (date_obj + random_interval).strftime(date_format)
     return None
-
 
 if __name__ == '__main__':
     # Get input and output datasets from script tool parameters
