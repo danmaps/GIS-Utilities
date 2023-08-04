@@ -90,7 +90,7 @@ def test_latlong_fields():
 def teardown_module():
     import os
     files = ["anonymized_test_data_1.csv", "anonymized_test_data_2.csv", "anonymized_test_data_3.csv",
-             "anonymized_test_data_latlong.csv"]
+             "anonymized_test_data_latlong.csv", "anonymized_test_data_numeric.csv"]
     for file in files:
         if os.path.exists(file):
             os.remove(file)
