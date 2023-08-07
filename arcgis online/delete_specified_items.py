@@ -15,7 +15,7 @@ def delete_items_by_id(gis, item_ids):
 
 if __name__ == "__main__":
     # Load the Excel file data into a Pandas DataFrame
-    data = pd.read_excel(r"P:\AGOL_HOSTED_SERVICES\Items Report\SCE_RP_GIS.xlsx")
+    data = pd.read_excel(r"user.xlsx")
 
     # Filter items with 'Proposed Action' set to 'Delete'
     items_to_delete = data[data['Proposed Action'] == 'Delete']
