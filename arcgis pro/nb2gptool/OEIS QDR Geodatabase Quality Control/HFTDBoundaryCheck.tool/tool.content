@@ -1,0 +1,16 @@
+{
+    "type": "ScriptTool",
+    "displayname": "$rc:title",
+    "app_ver": "13.1",
+    "product": "100",
+    "updated": "2023-07-27 15:53:22",
+    "params": {
+        "FeatureClass": {
+            "displayname": "$rc:featureclass.title",
+            "datatype": {
+                "type": "GPFeatureLayer"
+            }
+        }
+    },
+    "description": "$rc:description"
+}

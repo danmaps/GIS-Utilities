@@ -1,0 +1,10 @@
+{
+    "map": {
+        "dissolve_fields.title": "Dissolve Fields",
+        "equested_features.title": "Requested Features",
+        "in_feature_layer.title": "In Feature Layer",
+        "join_field.title": "Join Field",
+        "out_layer.title": "Out Layer",
+        "title": "Automated Data Extraction"
+    }
+}

@@ -1,0 +1,44 @@
+{
+    "type": "ScriptTool",
+    "displayname": "$rc:title",
+    "app_ver": "13.1",
+    "product": "100",
+    "updated": "2023-07-06 20:54:53",
+    "params": {
+        "Circuits_Source": {
+            "displayname": "$rc:circuits_source.title",
+            "datatype": {
+                "type": "DEFeatureClass"
+            },
+            "value": "\\\\sce\\workgroup\\CRE3\\SMG\\PROJECTS\\RP_DataIntegrity\\Proj_2018\\HFRA_Conductor_Validation\\Data\\CURRENT_DATA\\Q1_2023_DataProcessing.gdb\\Q1_HFRA_Conductor",
+            "value_json": "{\"catalogPath\":\"\\\\\\\\sce\\\\workgroup\\\\CRE3\\\\SMG\\\\PROJECTS\\\\RP_DataIntegrity\\\\Proj_2018\\\\HFRA_Conductor_Validation\\\\Data\\\\CURRENT_DATA\\\\Q1_2023_DataProcessing.gdb\\\\Q1_HFRA_Conductor\",\"name\":\"Q1_HFRA_Conductor\",\"datasetType\":\"esriDTFeatureClass\",\"dsId\":5,\"versioned\":false,\"canVersion\":false,\"configurationKeyword\":\"\",\"requiredGeodatabaseClientVersion\":\"10.0\",\"changeTracked\":false,\"replicaTracked\":false,\"hasOID\":true,\"hasOID64\":false,\"oidFieldName\":\"OBJECTID\",\"fields\":{\"fieldArray\":[{\"name\":\"OBJECTID\",\"type\":\"esriFieldTypeOID\",\"isNullable\":false,\"length\":4,\"precision\":0,\"scale\":0,\"required\":true,\"editable\":false,\"aliasName\":\"OBJECTID\"},{\"name\":\"SHAPE\",\"type\":\"esriFieldTypeGeometry\",\"isNullable\":true,\"length\":0,\"precision\":0,\"scale\":0,\"required\":true,\"geometryDef\":{\"avgNumPoints\":0,\"geometryType\":\"esriGeometryPolyline\",\"hasM\":false,\"hasZ\":false,\"spatialReference\":{\"wkt\":\"PROJCS[\\\"UTM_with_NAD83_datum_Zone_11_US_Foot_Central_Meridian_117d_W\\\",GEOGCS[\\\"GCS_North_American_1983\\\",DATUM[\\\"D_North_American_1983\\\",SPHEROID[\\\"GRS_1980\\\",6378137.0,298.257222101]],PRIMEM[\\\"Greenwich\\\",0.0],UNIT[\\\"Degree\\\",0.0174532925199433]],PROJECTION[\\\"Transverse_Mercator\\\"],PARAMETER[\\\"False_Easting\\\",1640416.66666667],PARAMETER[\\\"False_Northing\\\",0.0],PARAMETER[\\\"Central_Meridian\\\",-117.0],PARAMETER[\\\"Scale_Factor\\\",0.9996],PARAMETER[\\\"Latitude_Of_Origin\\\",0.0],UNIT[\\\"Foot_US\\\",0.3048006096012192]]\"},\"gridSize0\":760,\"gridSize1\":67640},\"aliasName\":\"SHAPE\"},{\"name\":\"CIRCUIT_TYPE\",\"type\":\"esriFieldTypeString\",\"isNullable\":true,\"length\":50,\"precision\":0,\"scale\":0,\"aliasName\":\"CIRCUIT_TYPE\"},{\"name\":\"CONDUCTOR_FID\",\"type\":\"esriFieldTypeDouble\",\"isNullable\":true,\"length\":8,\"precision\":0,\"scale\":0,\"aliasName\":\"CONDUCTOR_FID\"},{\"name\":\"ID_CONDUCTOR_TYPE\",\"type\":\"esriFieldTypeString\",\"isNullable\":true,\"length\":255,\"precision\":0,\"scale\":0,\"aliasName\":\"ID_CONDUCTOR_TYPE\"},{\"name\":\"CIRCUIT_FID\",\"type\":\"esriFieldTypeDouble\",\"isNullable\":true,\"length\":8,\"precision\":0,\"scale\":0,\"aliasName\":\"CIRCUIT_FID\"},{\"name\":\"SCE_CIRCUIT_NAME\",\"type\":\"esriFieldTypeString\",\"isNullable\":true,\"length\":50,\"precision\":0,\"scale\":0,\"aliasName\":\"SCE_CIRCUIT_NAME\"},{\"name\":\"SCE_FLOC\",\"type\":\"esriFieldTypeString\",\"isNullable\":true,\"length\":50,\"precision\":0,\"scale\":0,\"aliasName\":\"SCE_FLOC\"},{\"name\":\"SCE_ID_SYSTEM_VOLTAGE\",\"type\":\"esriFieldTypeString\",\"isNullable\":true,\"length\":255,\"precision\":0,\"scale\":0,\"aliasName\":\"SCE_ID_SYSTEM_VOLTAGE\"},{\"name\":\"SCE_ID_STATE\",\"type\":\"esriFieldTypeString\",\"isNullable\":true,\"length\":255,\"precision\":0,\"scale\":0,\"aliasName\":\"SCE_ID_STATE\"},{\"name\":\"CURRENTMONTH\",\"type\":\"esriFieldTypeString\",\"isNullable\":true,\"length\":12,\"precision\":0,\"scale\":0,\"aliasName\":\"CURRENTMONTH\"},{\"name\":\"DATE_EXTRACTED\",\"type\":\"esriFieldTypeDate\",\"isNullable\":true,\"length\":8,\"precision\":0,\"scale\":0,\"aliasName\":\"DATE_EXTRACTED\"},{\"name\":\"CALC_MI\",\"type\":\"esriFieldTypeDouble\",\"isNullable\":true,\"length\":8,\"precision\":0,\"scale\":0,\"aliasName\":\"CALC_MI\"},{\"name\":\"SHAPE_Length\",\"type\":\"esriFieldTypeDouble\",\"isNullable\":true,\"length\":8,\"precision\":0,\"scale\":0,\"required\":true,\"editable\":false}]},\"indexes\":{\"indexArray\":[{\"name\":\"FDO_OBJECTID\",\"isUnique\":true,\"isAscending\":true,\"fields\":{\"fieldArray\":[{\"name\":\"OBJECTID\",\"type\":\"esriFieldTypeOID\",\"isNullable\":false,\"length\":4,\"precision\":0,\"scale\":0,\"required\":true,\"editable\":false,\"aliasName\":\"OBJECTID\"}]}},{\"name\":\"FDO_SHAPE\",\"isUnique\":false,\"isAscending\":true,\"fields\":{\"fieldArray\":[{\"name\":\"SHAPE\",\"type\":\"esriFieldTypeGeometry\",\"isNullable\":true,\"length\":0,\"precision\":0,\"scale\":0,\"required\":true,\"geometryDef\":{\"avgNumPoints\":0,\"geometryType\":\"esriGeometryPolyline\",\"hasM\":false,\"hasZ\":false,\"spatialReference\":{\"wkt\":\"PROJCS[\\\"UTM_with_NAD83_datum_Zone_11_US_Foot_Central_Meridian_117d_W\\\",GEOGCS[\\\"GCS_North_American_1983\\\",DATUM[\\\"D_North_American_1983\\\",SPHEROID[\\\"GRS_1980\\\",6378137.0,298.257222101]],PRIMEM[\\\"Greenwich\\\",0.0],UNIT[\\\"Degree\\\",0.0174532925199433]],PROJECTION[\\\"Transverse_Mercator\\\"],PARAMETER[\\\"False_Easting\\\",1640416.66666667],PARAMETER[\\\"False_Northing\\\",0.0],PARAMETER[\\\"Central_Meridian\\\",-117.0],PARAMETER[\\\"Scale_Factor\\\",0.9996],PARAMETER[\\\"Latitude_Of_Origin\\\",0.0],UNIT[\\\"Foot_US\\\",0.3048006096012192]]\"},\"gridSize0\":760,\"gridSize1\":67640},\"aliasName\":\"SHAPE\"}]}}]},\"clsId\":\"{52353152-891A-11D0-BEC6-00805F7C4268}\",\"extClsId\":\"\",\"relationshipClassNames\":{\"names\":[]},\"aliasName\":\"\",\"modelName\":\"\",\"hasGlobalID\":false,\"globalIdFieldName\":\"\",\"rasterFieldName\":\"\",\"extensionProperties\":{\"type\":\"PropertySet\",\"propertySetItems\":[]},\"controllerMemberships\":[],\"editorTrackingEnabled\":false,\"creatorFieldName\":\"\",\"createdAtFieldName\":\"\",\"lastEditorFieldName\":\"\",\"editedAtFieldName\":\"\",\"isTimeInUTC\":true,\"catalogID\":\"{6EB7B499-72C8-4DAB-8E6A-E8D2E10BBEC9}\",\"fieldFilteringEnabled\":false,\"attributeRules\":[],\"featureType\":\"esriFTSimple\",\"shapeType\":\"esriGeometryPolyline\",\"shapeFieldName\":\"SHAPE\",\"hasM\":false,\"hasZ\":false,\"hasSpatialIndex\":true,\"areaFieldName\":\"\",\"lengthFieldName\":\"SHAPE_Length\",\"extent\":{\"xmin\":586119.95771782845,\"ymin\":12065285.230145074,\"xmax\":2904798.9371484965,\"ymax\":24678542.37201865,\"spatialReference\":{\"wkt\":\"PROJCS[\\\"UTM_with_NAD83_datum_Zone_11_US_Foot_Central_Meridian_117d_W\\\",GEOGCS[\\\"GCS_North_American_1983\\\",DATUM[\\\"D_North_American_1983\\\",SPHEROID[\\\"GRS_1980\\\",6378137.0,298.257222101]],PRIMEM[\\\"Greenwich\\\",0.0],UNIT[\\\"Degree\\\",0.0174532925199433]],PROJECTION[\\\"Transverse_Mercator\\\"],PARAMETER[\\\"False_Easting\\\",1640416.66666667],PARAMETER[\\\"False_Northing\\\",0.0],PARAMETER[\\\"Central_Meridian\\\",-117.0],PARAMETER[\\\"Scale_Factor\\\",0.9996],PARAMETER[\\\"Latitude_Of_Origin\\\",0.0],UNIT[\\\"Foot_US\\\",0.3048006096012192]]\"}},\"spatialReference\":{\"wkt\":\"PROJCS[\\\"UTM_with_NAD83_datum_Zone_11_US_Foot_Central_Meridian_117d_W\\\",GEOGCS[\\\"GCS_North_American_1983\\\",DATUM[\\\"D_North_American_1983\\\",SPHEROID[\\\"GRS_1980\\\",6378137.0,298.257222101]],PRIMEM[\\\"Greenwich\\\",0.0],UNIT[\\\"Degree\\\",0.0174532925199433]],PROJECTION[\\\"Transverse_Mercator\\\"],PARAMETER[\\\"False_Easting\\\",1640416.66666667],PARAMETER[\\\"False_Northing\\\",0.0],PARAMETER[\\\"Central_Meridian\\\",-117.0],PARAMETER[\\\"Scale_Factor\\\",0.9996],PARAMETER[\\\"Latitude_Of_Origin\\\",0.0],UNIT[\\\"Foot_US\\\",0.3048006096012192]]\"},\"splitModel\":\"esriSMUpdateInsert\"}"
+        },
+        "Request_Table": {
+            "displayname": "$rc:request_table.title",
+            "datatype": {
+                "type": "DETable"
+            }
+        },
+        "FLOC_Field": {
+            "displayname": "$rc:floc_field.title",
+            "datatype": {
+                "type": "Field"
+            },
+            "depends": [
+                "Request_Table"
+            ],
+            "value": "Circuit ID"
+        },
+        "Out_Layer": {
+            "direction": "out",
+            "displayname": "$rc:out_layer.title",
+            "datatype": {
+                "type": "DEFeatureClass"
+            },
+            "schema": {
+                "type": "GPFeatureSchema",
+                "generateoutputcatalogpath": "true"
+            }
+        }
+    }
+}

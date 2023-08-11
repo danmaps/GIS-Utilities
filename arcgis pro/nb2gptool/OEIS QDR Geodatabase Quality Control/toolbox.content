@@ -1,0 +1,13 @@
+{
+    "version": "1.0",
+    "alias": "OEISQDRGeodatabaseQualityControlatbx",
+    "displayname": "$rc:title",
+    "toolsets": {
+        "<root>": {
+            "tools": [
+                "CABoundary:CABoundary.tool",
+                "HFTDBoundaryCheck:HFTDBoundaryCheck.tool"
+            ]
+        }
+    }
+}

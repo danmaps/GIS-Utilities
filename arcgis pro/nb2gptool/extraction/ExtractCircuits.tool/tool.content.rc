@@ -1,0 +1,9 @@
+{
+    "map": {
+        "circuits_source.title": "Circuits Source",
+        "floc_field.title": "FLOC Field",
+        "out_layer.title": "Out Layer",
+        "request_table.title": "Request Table",
+        "title": "Extract Circuits"
+    }
+}
