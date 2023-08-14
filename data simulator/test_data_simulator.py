@@ -1,6 +1,6 @@
 import pytest
 import pandas as pd
-from ..dataSim import anonymize_gis_data
+from dataSim import anonymize_gis_data
 
 # Test CSV files
 TEST_CSV_1 = "test_data_1.csv"
