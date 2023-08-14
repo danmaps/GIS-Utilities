@@ -21,12 +21,12 @@ def test_numeric_fields():
     assert len(df_original.columns) == len(df_anonymized.columns)
 
     # Check characteristics of fields in the original and anonymized DataFrames
-    for i in range(1, len(df_original.columns) + 1):  # Assuming renaming pattern "field1", "field2", ...
+    for i in range(1, len(df_original.columns)):  # Assuming renaming pattern "field1", "field2", ...
         original_field = f'field{i}'
         anonymized_field = f'field{i}'
 
-        assert df_original[original_field].nunique() == df_anonymized[anonymized_field].nunique()
-        assert not df_original[original_field].equals(df_anonymized[anonymized_field])
+        assert df_original.iloc[:, i].nunique() == df_anonymized[anonymized_field].nunique()
+        assert not df_original.iloc[:, i].equals(df_anonymized[anonymized_field])
 
         # Check if data type and number of digits are preserved for numeric fields
         if original_field == 'IntegerField':
