@@ -17,20 +17,25 @@ def test_numeric_fields():
     df_original = pd.read_csv(TEST_CSV_NUMERIC)
     df_anonymized = pd.read_csv("anonymized_test_data_numeric.csv")
 
-    # Check if columns are preserved and values are anonymized
-    assert set(df_original.columns) == set(df_anonymized.columns)
-    for field in df_original.columns:
-        if field != 'OID':  # Exclude ID field
-            assert df_original[field].nunique() == df_anonymized[field].nunique()
-            assert not df_original[field].equals(df_anonymized[field])
+    # Check if anonymized DataFrame has the same number of columns as the original
+    assert len(df_original.columns) == len(df_anonymized.columns)
 
-            # Check if data type and number of digits are preserved for numeric fields
-            if field == 'IntegerField':
-                assert df_anonymized[field].dtype == 'int64'
-            elif field == 'FloatField':
-                assert df_anonymized[field].dtype == 'float64'
-                assert df_original[field].apply(lambda x: len(str(x).split(".")[1]) if pd.notnull(x) else 0).equals(
-                    df_anonymized[field].apply(lambda x: len(str(x).split(".")[1]) if pd.notnull(x) else 0))
+    # Check characteristics of fields in the original and anonymized DataFrames
+    for i in range(1, len(df_original.columns) + 1):  # Assuming renaming pattern "field1", "field2", ...
+        original_field = f'field{i}'
+        anonymized_field = f'field{i}'
+
+        assert df_original[original_field].nunique() == df_anonymized[anonymized_field].nunique()
+        assert not df_original[original_field].equals(df_anonymized[anonymized_field])
+
+        # Check if data type and number of digits are preserved for numeric fields
+        if original_field == 'IntegerField':
+            assert df_anonymized[anonymized_field].dtype == 'int64'
+        elif original_field == 'FloatField':
+            assert df_anonymized[anonymized_field].dtype == 'float64'
+            assert df_original[original_field].apply(lambda x: len(str(x).split(".")[1]) if pd.notnull(x) else 0).equals(
+                df_anonymized[anonymized_field].apply(lambda x: len(str(x).split(".")[1]) if pd.notnull(x) else 0))
+
 
 def test_string_fields():
     # Generate anonymized CSV
