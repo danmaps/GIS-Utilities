@@ -9,6 +9,21 @@ TEST_CSV_3 = "test_data_3.csv"
 TEST_CSV_NUMERIC = "test_data_numeric.csv"
 TEST_CSV_LATLONG = "test_data_latlong.csv"
 
+# Function to check characteristics of fields in DataFrames
+def check_field_characteristics(df_original, df_anonymized):
+    for field in df_original.columns:
+        if field != 'OID':  # Exclude ID field
+            assert df_original[field].nunique() == df_anonymized[field].nunique()
+            assert not df_original[field].equals(df_anonymized[field])
+
+            # Check if data type and number of digits are preserved for numeric fields
+            if field == 'IntegerField':
+                assert df_anonymized[field].dtype == 'int64'
+            elif field == 'FloatField':
+                assert df_anonymized[field].dtype == 'float64'
+                assert df_original[field].apply(lambda x: len(str(x).split(".")[1]) if pd.notnull(x) else 0).equals(
+                    df_anonymized[field].apply(lambda x: len(str(x).split(".")[1]) if pd.notnull(x) else 0))
+
 def test_numeric_fields():
     # Generate anonymized CSV
     anonymize_gis_data(TEST_CSV_NUMERIC, 3, "anonymized_test_data_numeric.csv")
@@ -21,21 +36,7 @@ def test_numeric_fields():
     assert len(df_original.columns) == len(df_anonymized.columns)
 
     # Check characteristics of fields in the original and anonymized DataFrames
-    for i in range(1, len(df_original.columns)):  # Assuming renaming pattern "field1", "field2", ...
-        original_field = f'field{i}'
-        anonymized_field = f'field{i}'
-
-        assert df_original.iloc[:, i].nunique() == df_anonymized[anonymized_field].nunique()
-        assert not df_original.iloc[:, i].equals(df_anonymized[anonymized_field])
-
-        # Check if data type and number of digits are preserved for numeric fields
-        if original_field == 'IntegerField':
-            assert df_anonymized[anonymized_field].dtype == 'int64'
-        elif original_field == 'FloatField':
-            assert df_anonymized[anonymized_field].dtype == 'float64'
-            assert df_original[original_field].apply(lambda x: len(str(x).split(".")[1]) if pd.notnull(x) else 0).equals(
-                df_anonymized[anonymized_field].apply(lambda x: len(str(x).split(".")[1]) if pd.notnull(x) else 0))
-
+    check_field_characteristics(df_original, df_anonymized)
 
 def test_string_fields():
     # Generate anonymized CSV
@@ -47,10 +48,7 @@ def test_string_fields():
 
     # Check if columns are preserved and values are anonymized
     assert set(df_original.columns) == set(df_anonymized.columns)
-    for field in df_original.columns:
-        if field != 'OID':  # Exclude ID field
-            assert df_original[field].nunique() == df_anonymized[field].nunique()
-            assert not df_original[field].equals(df_anonymized[field])
+    check_field_characteristics(df_original, df_anonymized)
 
 def test_date_fields():
     # Generate anonymized CSV
@@ -62,10 +60,7 @@ def test_date_fields():
 
     # Check if columns are preserved and values are anonymized
     assert set(df_original.columns) == set(df_anonymized.columns)
-    for field in df_original.columns:
-        if field != 'OID':  # Exclude ID field
-            assert df_original[field].nunique() == df_anonymized[field].nunique()
-            assert not df_original[field].equals(df_anonymized[field])
+    check_field_characteristics(df_original, df_anonymized)
 
 def test_latlong_fields():
     # Generate anonymized CSV
@@ -77,20 +72,7 @@ def test_latlong_fields():
 
     # Check if columns are preserved and values are anonymized
     assert set(df_original.columns) == set(df_anonymized.columns)
-    for field in df_original.columns:
-        if field != 'OID':  # Exclude ID field
-            assert df_original[field].nunique() == df_anonymized[field].nunique()
-            assert not df_original[field].equals(df_anonymized[field])
-
-            # Check if lat/long values are shifted within a reasonable range
-            if field.lower() == 'latitude':
-                min_val, max_val = df_original[field].min(), df_original[field].max()
-                assert (df_anonymized[field] >= min_val - 0.1).all()
-                assert (df_anonymized[field] <= max_val + 0.1).all()
-            elif field.lower() == 'longitude':
-                min_val, max_val = df_original[field].min(), df_original[field].max()
-                assert (df_anonymized[field] >= min_val - 0.1).all()
-                assert (df_anonymized[field] <= max_val + 0.1).all()
+    check_field_characteristics(df_original, df_anonymized)
 
 # Clean up after tests
 def teardown_module():
