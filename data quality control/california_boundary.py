@@ -24,7 +24,25 @@ def main():
         
         arcpy.AddError(f"OIDs {', '.join(map(str,objectids))} outside of CA.\n")
         
+        # Access current project/map
+        aprx = arcpy.mp.ArcGISProject("CURRENT")
+        mv = aprx.activeView # mapview
+        my_layer = mv.map.listLayers(f"{lyr}")[0]
+        desc = arcpy.Describe(my_layer)
+        oid_field = desc.OIDFieldName
+        
+        # Select by objectid, the problematic features in the input feature class
+        for oid in objectids:
+            arcpy.SelectLayerByAttribute_management(my_layer.name,
+                                                    "ADD_TO_SELECTION", 
+                                                    oid_field+"="+str(oid))
+
+        
+        # Zoom to selected problematic features
+        mv.camera.setExtent(mv.getLayerExtent(my_layer))
+        
         return
+    # no problem features found
     arcpy.AddMessage("Pass!")
 
 if __name__ == "__main__":
