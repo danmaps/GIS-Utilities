@@ -1,6 +1,16 @@
 import arcpy
 
 def flip_lines_near_points(input_lines, points, distance, bearing_field='BEARING_FIELD', line_bearing='LINE_BEARING'):
+    """
+    Identifies eligible lines near specified points and adjusts their directions based on proximity.
+    
+    Args:
+        input_lines (str): Path to the input line feature class.
+        points (str): Path to the points feature class used for proximity checks.
+        distance (float): Maximum distance threshold for point-line proximity (units based on the coordinate system).
+        bearing_field (str, optional): Name of the field to store calculated bearing. Defaults to 'BEARING_FIELD'.
+        line_bearing (str, optional): Name of the field to store line bearing attribute. Defaults to 'LINE_BEARING'.
+    """
     # Step 1: find eligible lines
     duplicate_dict = {}
 
@@ -51,8 +61,11 @@ distance = 20 # unit based on Map's coordinate system linear unit value, usually
 flip_lines_near_points(input_lines, points, distance)
 
 
-
 def degrees_to_cardinal(d):
+    """
+     enhances bearing information by converting degrees to
+     cardinal directions (e.g., N, NE, E, etc.) 
+    """
     dirs = ["N", "NNE", "NE", "ENE", "E", "ESE", "SE", "SSE",
             "S", "SSW", "SW", "WSW", "W", "WNW", "NW", "NNW"]
     return dirs[int((d + 11.25)/22.5) % 16]
