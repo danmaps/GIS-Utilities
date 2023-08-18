@@ -94,7 +94,7 @@ if os.path.exists(count_file):
         explode_shapefile(input_shp,os.path.join(os.path.dirname(input_shp),"exploded"))
 
         # Zip the entire output directory
-        zip_name = os.path.join(onedrive_folder, f"WorkOrders_{today_date}_separate.zip") 
+        zip_name = os.path.join(onedrive_folder, f"WorkOrders_{today_date}_separate") 
         out_dir = os.path.join(onedrive_folder,out_name)
         shutil.make_archive(zip_name,'zip',out_dir)
         # print(out_dir)
