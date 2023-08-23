@@ -52,7 +52,7 @@ today_date = datetime.datetime.now().strftime("%m%d%Y_%H%M%S")
 out_name = "WorkOrders_" + today_date
 
 # Check count file
-count_file = os.path.join(onedrive_folder, "count.txt")
+count_file = os.path.join(onedrive_folder+"_count", "count.txt")
 if os.path.exists(count_file):
     with open(count_file) as f:
         prev_count = int(f.read())
@@ -86,7 +86,7 @@ if os.path.exists(count_file):
         print(new_item.homepage)
         
         # Overwrite count file
-        with open(os.path.join(onedrive_folder,"count.txt"),"w") as f:
+        with open(count_file,"w") as f:
             f.write(str(count))                   
 
         # Explode shapefile into separate work order shapefiles
