@@ -7,6 +7,10 @@ import shutil
 
 def explode_shapefile(input_shp, output_folder):
     """Explodes a shapefile with polygons into separate shapefiles based on 'WorkOrder' attribute"""
+
+    # todo: replace with Split By Attributes (Analysis)
+    # arcpy.analysis.SplitByAttributes(Input_Table, Target_Workspace, Split_Fields)
+    # https://pro.arcgis.com/en/pro-app/latest/tool-reference/analysis/split-by-attributes.htm
     
     # Get the shapefile name without extension
     shp_name = os.path.splitext(os.path.basename(input_shp))[0]
