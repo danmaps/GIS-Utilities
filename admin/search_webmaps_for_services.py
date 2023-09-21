@@ -1,5 +1,5 @@
 '''
-scans an organisation for Web Maps and Web Mapping Applications for an input service or services
+scans an organization for Web Maps and Web Mapping Applications for an input service or services
 '''
 
 from arcgis.gis import GIS

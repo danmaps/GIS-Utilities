@@ -1,4 +1,5 @@
 import pandas as pd
+from arcgis.gis import GIS
 
 # Connect to ArcGIS Online
 gis = GIS('Pro')  

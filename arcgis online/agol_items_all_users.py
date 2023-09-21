@@ -1,5 +1,4 @@
 import pandas as pd
-import arcgis
 from arcgis.gis import GIS
 
 # Connect to AGOL
