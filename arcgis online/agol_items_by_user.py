@@ -40,4 +40,4 @@ def format_date(df):
   df['lastViewed'] = df['lastViewed'].dt.strftime('%Y-%m-%d %H:%M:%S')
 
 # Get items for a user  
-get_item(gis.users.search('user')[0])
+get_item(gis.users.search(gis.properties['user']['username'])[0])
