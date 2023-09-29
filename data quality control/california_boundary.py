@@ -20,30 +20,30 @@ def main():
         arcpy.AddError(f"Found {count} assets outside the CA boundary.")
     
         # Get a list of OBJECTIDs for selected features
-        objectids = [row[0] for row in arcpy.da.SearchCursor(f"{lyr}", ['OBJECTID'])]
+        desc = arcpy.Describe(lyr)
+        oid_field = desc.OIDFieldName
+        objectids = [row[0] for row in arcpy.da.SearchCursor(f"{lyr}", [f'{oid_field}'])]
         
         arcpy.AddError(f"OIDs {', '.join(map(str,objectids))} outside of CA.\n")
         
         # Access current project/map
         aprx = arcpy.mp.ArcGISProject("CURRENT")
         mv = aprx.activeView # mapview
-        my_layer = mv.map.listLayers(f"{lyr}")[0]
-        desc = arcpy.Describe(my_layer)
-        oid_field = desc.OIDFieldName
+        if type(mv) == "MapView":
+            my_layer = mv.map.listLayers(f"{lyr}")[0]
         
-        # Select by objectid, the problematic features in the input feature class
-        for oid in objectids:
-            arcpy.SelectLayerByAttribute_management(my_layer.name,
+            # Select by objectid, the problematic features in the input feature class
+            for oid in objectids:
+                arcpy.SelectLayerByAttribute_management(my_layer.name,
                                                     "ADD_TO_SELECTION", 
                                                     oid_field+"="+str(oid))
 
-        
-        # Zoom to selected problematic features
-        mv.camera.setExtent(mv.getLayerExtent(my_layer))
+            # Zoom to selected problematic features
+            mv.camera.setExtent(mv.getLayerExtent(my_layer))
         
         return
     # no problem features found
-    arcpy.AddMessage("Pass!")
+    arcpy.AddMessage(" This item has PASSED this QC check. Mark it as such and continue to the next step.")
 
 if __name__ == "__main__":
     main()
