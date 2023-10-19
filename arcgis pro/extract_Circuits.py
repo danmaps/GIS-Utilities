@@ -17,10 +17,7 @@ def join_tables(field):
 def dissolve_features(feature, output):
     """Dissolves features based on certain fields."""
     fc_name = arcpy.Describe(feature).name
-    dissolve_fields = [f"{fc_name}.{field_name}" for field_name in ["CIRCUIT_TYPE", 
-                                                                    "SCE_FLOC", 
-                                                                    "SCE_ID_SYSTEM_VOLTAGE", 
-                                                                    "SCE_CIRCUIT_NAME"]]
+    dissolve_fields = [f"{fc_name}.{field_name}" for field_name in ["CIRCUIT_NAME"]]
     arcpy.analysis.PairwiseDissolve(in_features="HFRA_Conductor", out_feature_class=output, 
                                     dissolve_field=";".join(dissolve_fields))
 def script_tool(feature, request_table, FLOC_field, output):
