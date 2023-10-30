@@ -1,3 +1,4 @@
+import arcpy
 from typing import List, Union
 
 def squash_nulls(layer: str, fields: Union[str, List[str]]) -> bool:
@@ -29,6 +30,6 @@ def squash_nulls(layer: str, fields: Union[str, List[str]]) -> bool:
     
     return True
 
-layer = "Street Lights"
-fields = "SUB_FLOC"
-squash_nulls(layer, fields)
+# layer = "Street Lights"
+# fields = "SUB_FLOC"
+# squash_nulls(layer, fields)
