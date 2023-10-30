@@ -1,4 +1,10 @@
-def check_data(layer, fields):
+from typing import List, Union
+
+def squash_nulls(layer: str, fields: Union[str, List[str]]) -> bool:
+    # If fields is not a list, convert it into a list
+    if not isinstance(fields, list):
+        fields = [fields]
+    
     for field in fields:
         print(f"looking at field: {field}")
         
@@ -23,10 +29,6 @@ def check_data(layer, fields):
     
     return True
 
-
-    return True
-
-
 layer = "Street Lights"
-fields = ["SUB_FLOC", "SUB"]
-check_data(layer, fields)
+fields = "SUB_FLOC"
+squash_nulls(layer, fields)
