@@ -1,0 +1,2477 @@
+
+
+# ====================
+# CloneUsersGroupsSharingshell.py
+# ====================
+
+from __future__ import print_function
+#
+#   This example demonstrates how to stage a new Portal with user accounts,
+#     Groups, and Group Memebership in order to establish a shell of a Portal
+#     that is "ready to go" for users to start contributing content.
+#
+#   This copies all Users accounts, Groups, Group Sharing, and Group membership
+#     from a source Portal to a target Portal.
+#
+#   This assumes that the Target Portal is a new, clean installation and there
+#     would be no conflicts of usernames or group names during the copy process.
+#
+#   This script does NOT copy any User content.
+#
+
+import sys
+import six
+from arcgis.gis import *
+
+if six.PY3:
+    from urllib.error import URLError
+else:
+    # unresolved reference in Python3, but should work if running from Python2
+    from urllib2 import URLError
+
+def copy_user(target, user, password):
+    # See if the user has firstName and lastName properties
+    try:
+        firstname = user.firstName
+        lastname = user.lastName
+    except:
+        # if not, split the fullName
+        fullName = user.fullName
+        firstname = fullName.split()[0]
+        try:
+            lastname = fullName.split()[1]
+        except:
+            lastname = ' '
+
+    try:
+        testuser = target.users.get(user.username)
+        if not testuser is None:
+            print("\tUsername {} already exists in Target Portal; skipping user creation.\n".format(user.username))
+            return testuser
+
+        target_user = target.users.create(user.username, password, firstname, lastname,
+                                          user.email, user.description, user.role, user.provider, user.idpUsername)
+
+        # update user properties from existing user
+        target_user.update(user.access, user.preferredView,
+                           user.description, user.tags, user.get_thumbnail_link(),
+                           culture=user.culture, region=user.region)
+
+        # update user role; assumes no custom roles
+        if 'role' in user and not user.role == 'org_user':
+            target_user.update_role(user.role)
+
+        return target_user
+
+    except:
+        print("Unable to create user "+ user.username)
+        return None
+
+def copy_group(target, source, group):
+    ''' Copy group to the target portal.'''
+    GROUP_COPY_PROPERTIES = ['title', 'description', 'tags', 'snippet', 'phone', 'access', 'isInvitationOnly']
+    with tempfile.TemporaryDirectory() as temp_dir:
+        # Create a new groups with the subset of properties we want to
+        # copy to the target portal. Handle switching between org and
+        # public access when going from an org in a multitenant portal
+        # and a single tenant portal
+        target_group = {}
+
+        for property_name in GROUP_COPY_PROPERTIES:
+            target_group[property_name] = group[property_name]
+
+        if target_group['access'] == 'org' and target.properties['portalMode'] == 'singletenant':
+            target_group['access'] = 'public'
+        elif target_group['access'] == 'public' and source.properties['portalMode'] == 'singletenant' \
+             and target.properties['portalMode'] == 'multitenant' and 'id' in target.properties: # is org
+            target_group['access'] = 'org'
+
+        # Handle the thumbnail (if one exists)
+        thumbnail_file = None
+        if 'thumbnail' in group:
+            target_group['thumbnail'] = group.download_thumbnail(temp_dir)
+
+        # Create the group in the target portal
+        copied_group = target.groups.create_from_dict(target_group)
+
+         # Reassign all groups to correct owners, add users, and find shared items
+        members = group.get_members()
+        copied_group.reassign_to(members['owner'])
+        if members['users']:
+            copied_group.add_users(members['users'])
+
+        # remove the admin user copying this group from the copied group if that
+        #   username is not part of the group in the Source Portal
+        if not target.users.me.username in members['users']:
+            copied_group.remove_users(target.users.me.username)
+
+        return copied_group
+
+# Wrap source GIS connection with error handling to determine why it may fail
+try:
+    source = GIS("https://gleneagle.esri.com:7443/arcgis", "portaladmin", "secretpwd")
+except URLError as e:
+    sys.exit("Invalid Source Portal URL...")
+except RuntimeError as e2:
+    sys.exit("Invalid Source Portal username/password...")
+
+# Wrap target GIS connection with error handling to determine why it may fail
+try:
+    target = GIS("https://ps002233.esri.com/portal", "portaladmin", "secretpwd", verify_cert=False)
+except URLError as e:
+    sys.exit("Invalid Taget Portal URL...")
+except RuntimeError as e2:
+    sys.exit("Invalid Target Portal username/password...")
+
+# Get all users from the Source Portal; set max_users to make sure you get all users
+sourceusers = source.users.search(max_users=500)
+
+# Create a list of "system" Portal users that we will ignore during copy
+systemusers = ['system_publisher', 'esri_nav', 'esri_livingatlas', 'esri_boundaries', 'esri_demographics', str(source.users.me.username)]
+
+for user in sourceusers:
+    if not user.username in systemusers:
+        print('Copying {}...'.format(user.username))
+        if user.provider == 'arcgis':
+            copy_user(target, user, 'TestPassword@123')
+        elif user.provider == 'enterprise':  # web tier authenticated users
+            copy_user(target, user, 'NoPwdUsed')
+
+# Get list of groups from the Source Portal and also from Target Portal (for cleanup purposes)
+sourcegroups = source.groups.search()
+targetgroups = target.groups.search()
+
+# Create a list of "system" Portal Groups that we will ignore during copy
+systemgroups = ['Navigator Maps', 'Featured Maps and Apps']
+
+# Let's make sure in our Target Portal, existing Groups don't already exist.
+#   This is useful in testing and cleaning up Groups before trying again.
+#   The assumption is this script is copying to a new, clean Portal.
+for tg in targetgroups:
+    for sg in sourcegroups:
+        if sg.title == tg.title and (not tg.owner in systemusers) and (not tg.title in systemgroups):
+            print("Cleaning up group {} in target Portal...".format(tg.title))
+            tg.delete()
+            break
+
+for grp in sourcegroups:
+    if not grp.title in systemgroups:
+        print('Copying Group {}...'.format(grp.title))
+        tgt_group = copy_group(target, source, grp)
+
+
+
+
+# ====================
+# batch_creation_of_groups_rn.py
+# ====================
+
+#!/usr/bin/env python
+# coding: utf-8
+
+# # Batch creation of Groups
+# 
+# This sample notebook automates the task of creating groups in a Portal for ArcGIS or ArcGIS Online organization. A similar script can be used for creating or updating users and content.
+# 
+# **Note**: To run this sample, you need the ``pandas`` library in your conda environment. If you don't have the library, install it by running the following command from cmd.exe or your shell
+# ```
+# conda install pandas```
+
+# <h1>Table of Contents<span class="tocSkip"></span></h1>
+# <div class="toc"><ul class="toc-item"><li><span><a href="#Batch-creation-of-Groups" data-toc-modified-id="Batch-creation-of-Groups-1"><span class="toc-item-num">1&nbsp;&nbsp;</span>Batch creation of Groups</a></span><ul class="toc-item"><li><span><a href="#Data-preparation" data-toc-modified-id="Data-preparation-1.1"><span class="toc-item-num">1.1&nbsp;&nbsp;</span>Data preparation</a></span></li></ul></li></ul></div>
+
+# In[1]:
+
+
+from arcgis.gis import GIS
+from IPython.display import display
+import pandas as pd
+
+
+# ## Data preparation
+# 
+# In this sample, a list of groups to be created is read from a .csv file along with the properties and thumbnails to be used for creating the groups.
+
+# In[2]:
+
+
+groups_df = pd.read_csv('data/groups.csv')
+
+
+# In[3]:
+
+
+groups_df[:3]
+
+
+# In[4]:
+
+
+gis = GIS("https://pythonapi.playground.esri.com/portal", "arcgis_python", "amazing_arcgis_123")
+
+
+# Before we proceed, we will verify if these groups do not exist in our organization. If they exist, we will delete them so that we can re-create as part of the process that follows.
+
+# In[5]:
+
+
+for group_name in groups_df['title']:
+    g = gis.groups.search(query='title:'+group_name)
+    #if group exists with the title, delete it
+    if len(g)>0:
+        g[0].delete()
+
+
+#  The thumbnails are extracted from an Icons.zip file. 
+
+# In[6]:
+
+
+import zipfile
+with zipfile.ZipFile("data/Icons.zip") as z:
+    z.extractall("data")
+
+
+# The code below reads the csv file line by line and creates groups in the portal using the specified parameters and thumbnails.
+
+# In[7]:
+
+
+import csv
+
+groups = []
+with open('data/groups.csv') as csvfile:
+    reader = csv.DictReader(csvfile)
+    for row in reader:
+        group = gis.groups.create_from_dict(row)
+        groups.append(group)   
+
+
+# To verify, we can display the newly created groups:
+
+# In[8]:
+
+
+for group in groups:
+    display(group)
+
+
+# In[ ]:
+
+
+
+
+
+
+# ====================
+# clone_a_group.py
+# ====================
+
+#!/usr/bin/env python
+# coding: utf-8
+
+# # Clone a Group 
+# 
+# This sample notebook can be used for cloning one or more groups, either on the same portal or from one portal to another.
+# 
+# **Note:** If you want to clone all portal users, groups and content refer to the sample 
+# [Clone Portal users, groups and content](clone_portal_users_groups_and_content.ipynb)
+# 
+# In this sample, we will clone the [Vector Basemaps](http://www.arcgis.com/home/group.html?id=30de8da907d240a0bccd5ad3ff25ef4a) group from ArcGIS Online to an ArcGIS Enterprise.
+
+# <h1>Table of Contents<span class="tocSkip"></span></h1>
+# <div class="toc"><ul class="toc-item"><li><span><a href="#Clone-a-Group" data-toc-modified-id="Clone-a-Group-1"><span class="toc-item-num">1&nbsp;&nbsp;</span>Clone a Group</a></span><ul class="toc-item"><li><span><a href="#Define-the-source-and-target-portals" data-toc-modified-id="Define-the-source-and-target-portals-1.1"><span class="toc-item-num">1.1&nbsp;&nbsp;</span>Define the source and target portals</a></span></li><li><span><a href="#Search-for-the-group-and-its-contents-in-the-source-portal" data-toc-modified-id="Search-for-the-group-and-its-contents-in-the-source-portal-1.2"><span class="toc-item-num">1.2&nbsp;&nbsp;</span>Search for the group and its contents in the source portal</a></span></li><li><span><a href="#Clone-the-group-in-the-target-portal-if-it-does-not-already-exist." data-toc-modified-id="Clone-the-group-in-the-target-portal-if-it-does-not-already-exist.-1.3"><span class="toc-item-num">1.3&nbsp;&nbsp;</span>Clone the group in the target portal if it does not already exist.</a></span></li><li><span><a href="#Clone-the-contents-of-the-group-to-the-target-portal" data-toc-modified-id="Clone-the-contents-of-the-group-to-the-target-portal-1.4"><span class="toc-item-num">1.4&nbsp;&nbsp;</span>Clone the contents of the group to the target portal</a></span></li></ul></li></ul></div>
+
+# In[1]:
+
+
+from arcgis.gis import GIS
+from IPython.display import display
+
+
+# ## Define the source and target portals
+# 
+# To start with, define the source and target portals.
+
+# In[2]:
+
+
+# an anonymous connection to ArcGIS Online is sufficient, 
+# since we are cloning a public group
+source = GIS()
+
+target = GIS("https://pythonapi.playground.esri.com/portal")
+
+
+# ## Search for the group and its contents in the source portal
+# In the source portal, search for the group to be cloned. In our case the title of the group is 'Vector Basemaps'.
+
+# In[5]:
+
+
+source_groups = source.groups.search("title:Vector Basemaps AND owner:esri", outside_org = True)
+source_groups
+
+
+# In[7]:
+
+
+source_group = source_groups[1]
+source_group
+
+
+# List the items that are a part of the group 'Vector Basemaps'.
+
+# In[8]:
+
+
+source_items = source_group.content()
+source_items
+
+
+# ## Clone the group in the target portal if it does not already exist. 
+# 
+# We create a new group in the target portal with all the properties of the group in the source portal. 
+
+# In[9]:
+
+
+import tempfile
+if not target.groups.search('Vector Basemaps'):
+    try:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            thumbnail_file = source_group.download_thumbnail(temp_dir)
+            
+            #create a group in the target portal with all the properties of the group in the source
+            target_group = target.groups.create(title = source_group.title,
+                                                 tags = source_group.tags,
+                                                 description = source_group.description,
+                                                 snippet = source_group.snippet,
+                                                 access = source_group.access, 
+                                                 thumbnail= thumbnail_file,
+                                                 is_invitation_only = True,
+                                                 sort_field = 'avgRating',
+                                                 sort_order ='asc',
+                                                 is_view_only=True)
+            #display the group
+            display(target_group)
+            
+    except Exception as e:
+        print('Group {} could not be created'.format(source_group.title))
+        print(e)
+else:
+    print('Group {} already exists in the portal'.format(source_group.title))
+    target_group = target.groups.search('Vector Basemaps')[0]
+
+
+# ## Clone the contents of the group to the target portal
+# It is possible that some items to be cloned may already be present on the target portal. In such a situation, we simply share those items with the target group. Thus, in the section below, we renew our list of items to be cloned by removing from it, any item that was existing on the target portal beforehand.
+
+# In[10]:
+
+
+#making a list for the items to be cloned in the target portal
+items_to_be_cloned = list(source_items)
+
+#checking for the presence of the item in the target portal 
+for item in source_items:
+    searched_items = target.content.search(query='title:'+item.title, item_type = item.type)   
+    
+    for s_item in searched_items:
+        
+        if s_item.title == item.title:
+            
+            #if an item is not a part of the group in the target portal then share it 
+            if s_item not in target_group.content():
+                s_item.share(groups= [target_group])
+            
+            #remove the already existing item from the list of items to be cloned
+            items_to_be_cloned.remove(item)                
+            
+            #display the item
+            display(s_item)      
+                     
+            break
+
+
+# Now after having removed the existing items from the list of items to be cloned, we can easily copy the remaining content of the source group to the newly created group in the target portal.  
+
+# In[11]:
+
+
+#cloning all items that were not present on the portal before
+for item in items_to_be_cloned:    
+    try:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            thumbnail_file = item.download_thumbnail(temp_dir)
+            metadata_file = item.download_metadata(temp_dir)
+            target_item_properties = {'title': item.title,
+                                      'tags': item.tags,
+                                      'text':item.get_data(True),
+                                      'type':item.type,
+                                      'url':item.url
+                                     }       
+            #create an item
+            target_item = target.content.add(target_item_properties, thumbnail=thumbnail_file)
+            
+            #share that item with the group on the target portal
+            target_item.share(groups=[target_group])
+            
+            #display the item
+            display(target_item)
+            
+    except Exception as e:
+        print('Item {} could not be created in the target portal'.format(item.title))
+        print(e)
+
+
+
+# ====================
+# clone_portal_users_groups_and_content_rn.py
+# ====================
+
+#!/usr/bin/env python
+# coding: utf-8
+
+# # Clone Portal users, groups and content
+# 
+# This sample notebook can be used for cloning a portal, from say, a staging to a production environment. It clones the users, groups and the content. It does not copy over services though, and works at the tier of portal items.
+# 
+# **Note**: To use this notebook as a Python script, check out the accompanying [SDK GitHub](https://github.com/Esri/arcgis-python-api) repository. Running this as a script from a Python IDE allows you to set breakpoints, debug, and inspect the script when an exception is raised.
+
+# <h1>Table of Contents<span class="tocSkip"></span></h1>
+# <div class="toc"><ul class="toc-item"><li><span><a href="#Clone-Portal-users,-groups-and-content" data-toc-modified-id="Clone-Portal-users,-groups-and-content-1"><span class="toc-item-num">1&nbsp;&nbsp;</span>Clone Portal users, groups and content</a></span><ul class="toc-item"><li><span><a href="#Define-the-source-and-target-portals" data-toc-modified-id="Define-the-source-and-target-portals-1.1"><span class="toc-item-num">1.1&nbsp;&nbsp;</span>Define the source and target portals</a></span></li></ul></li><li><span><a href="#Users" data-toc-modified-id="Users-2"><span class="toc-item-num">2&nbsp;&nbsp;</span>Users</a></span><ul class="toc-item"><li><ul class="toc-item"><li><span><a href="#Remove-existing-users-from-target-portal" data-toc-modified-id="Remove-existing-users-from-target-portal-2.0.1"><span class="toc-item-num">2.0.1&nbsp;&nbsp;</span>Remove existing users from target portal</a></span></li><li><span><a href="#Copy-Users" data-toc-modified-id="Copy-Users-2.0.2"><span class="toc-item-num">2.0.2&nbsp;&nbsp;</span>Copy Users</a></span></li></ul></li></ul></li><li><span><a href="#Groups" data-toc-modified-id="Groups-3"><span class="toc-item-num">3&nbsp;&nbsp;</span>Groups</a></span><ul class="toc-item"><li><span><a href="#Copy-Groups" data-toc-modified-id="Copy-Groups-3.1"><span class="toc-item-num">3.1&nbsp;&nbsp;</span>Copy Groups</a></span></li></ul></li><li><span><a href="#Items" data-toc-modified-id="Items-4"><span class="toc-item-num">4&nbsp;&nbsp;</span>Items</a></span><ul class="toc-item"><li><span><a href="#For-each-user-create-a-mapping-of-itemId-to-the-Item" data-toc-modified-id="For-each-user-create-a-mapping-of-itemId-to-the-Item-4.1"><span class="toc-item-num">4.1&nbsp;&nbsp;</span>For each user create a mapping of itemId to the <code>Item</code></a></span></li><li><span><a href="#Prepare-sharing-information-for-each-item" data-toc-modified-id="Prepare-sharing-information-for-each-item-4.2"><span class="toc-item-num">4.2&nbsp;&nbsp;</span>Prepare sharing information for each item</a></span><ul class="toc-item"><li><span><a href="#Print-a-mapping-of-item-and-its-group-membership" data-toc-modified-id="Print-a-mapping-of-item-and-its-group-membership-4.2.1"><span class="toc-item-num">4.2.1&nbsp;&nbsp;</span>Print a mapping of item and its group membership</a></span></li></ul></li><li><span><a href="#Copy-Items" data-toc-modified-id="Copy-Items-4.3"><span class="toc-item-num">4.3&nbsp;&nbsp;</span>Copy Items</a></span></li><li><span><a href="#Establish-relationship-between-items" data-toc-modified-id="Establish-relationship-between-items-4.4"><span class="toc-item-num">4.4&nbsp;&nbsp;</span>Establish relationship between items</a></span></li><li><span><a href="#Conclusion" data-toc-modified-id="Conclusion-4.5"><span class="toc-item-num">4.5&nbsp;&nbsp;</span>Conclusion</a></span></li></ul></li></ul></div>
+
+# In[1]:
+
+
+# Import libraries
+from arcgis.gis import GIS
+from IPython.display import display
+from getpass import getpass
+
+
+# ## Define the source and target portals
+# To start with, define the source and target portals. Connect to them using accounts with administrative privileges:
+
+# In[2]:
+
+
+source_password = getpass()
+target_password = getpass()
+source = GIS("source portal url", username, source_password)
+target = GIS("target portal url", username, target_password)
+target_admin_username = 'admin'
+
+
+# # Users
+# List the users in the source and target portals. We do not want to copy over system accounts since those would be available in the target portal as well. Hence, filter the search by negating any account that starts with 'esri_'. We also do not want to copy over the [initial administrator account](http://server.arcgis.com/en/portal/latest/administer/linux/about-the-initial-administrator-account.htm) as one would be present in the target as well. Hence, negate the account that starts with `admin` which happens to be the administrator account on source portal.
+
+# In[3]:
+
+
+#!esri_ & !admin
+source_users = source.users.search('!esri_ & !admin')
+for user in source_users:
+    print(user.username + "\t:\t" + str(user.role))
+
+
+# Get the number of users to migrate:
+
+# In[4]:
+
+
+len(source_users)
+
+
+# Get the list of users already present in the target portal. Similar to earlier, filter out system and initial administrator accounts. The name of the admin account on target portal is `admin` as well in this example.
+
+# In[5]:
+
+
+# filter out system and initial administrator accounts
+target_users = target.users.search('!esri_ & !admin & !system_publisher')
+target_users
+
+
+# If users found on source portal were already in the target portal, run the following code to delete them. You can choose to not delete them as well.
+# 
+# ### Remove existing users from target portal
+# If you want to clean up the target portal except for the initial administrator account, run the cell below. As you delete, you may opt to assign their content to the initial administrator account.
+
+# In[6]:
+
+
+for source_user in source_users:
+    try:
+        target_user = target.users.get(source_user.username)
+        if target_user is not None:
+            print('Deleting user: ' + target_user.fullName)
+            target_user.reassign_to(target_admin_username)
+            target_user.delete()
+    except:
+        print('User {} does not exist in Target Portal'.format(source_user.username))
+
+
+# ### Copy Users
+# Create a function that will accept connection to the target portal, `User` objects from source portal and password to create users with. In addition to creating the users, this function will set their access, description, tags and other similar properties from source. If a user by the same name already exists in the target portal (possible if you opted not to clean out the target portal) then this function prints out an error message.
+
+# In[7]:
+
+
+def copy_user(target_portal, source_user, password):
+    # See if the user has firstName and lastName properties
+    try:
+        first_name = source_user.firstName
+        last_name = source_user.lastName
+    except:
+        # if not, split the fullName
+        full_name = source_user.fullName
+        first_name = full_name.split()[0]
+        try:
+            last_name = full_name.split()[1]
+        except:
+            last_name = 'NoLastName'
+
+    try:
+        # create user
+        target_user = target_portal.users.create(source_user.username, password, first_name, 
+                                                 last_name, source_user.email, 
+                                                 source_user.description, source_user.role)
+
+        # update user properties
+        target_user.update(source_user.access, source_user.preferredView,
+                           source_user.description, source_user.tags, 
+                           source_user.get_thumbnail_link(),
+                           culture=source_user.culture, region=source_user.region)
+        return target_user
+    
+    except Exception as Ex:
+        print(str(Ex))
+        print("Unable to create user "+ source_user.username)
+        return None
+
+
+# For each user in source portal, make a corresponding user in target portal. In this sample, we provide a common password to all users `TestPassword@123` as we are creating users off the built-in identity store. If you are creating users off your enterprise identity store, you can ignore the `password` parameter and use the `provider` and `idp_username` parameters as explained in the [API reference doc](https://developers.arcgis.com/python/api-reference/arcgis.gis.toc.html#arcgis.gis.UserManager.create).
+
+# In[8]:
+
+
+for user in source_users:
+    print("Creating user: " + user.username)
+    copy_user(target, user, 'TestPassword@123')
+
+
+# Verify that users have been added to target portal:
+
+# In[9]:
+
+
+target_users = target.users.search()
+target_users
+
+
+# Thus, users have been successfully added to the target portal
+
+# # Groups
+
+# List the groups in the source and target portals. Similar to how we searched for users, we will ignore the system created and default groups as they would be available on the target portal as well.
+
+# In[10]:
+
+
+# filter out system created groups
+source_groups = source.groups.search("!owner:esri_* & !Basemaps")
+source_groups
+
+
+# In[11]:
+
+
+target_groups = target.groups.search("!owner:esri_* & !Basemaps")
+target_groups
+
+
+# If any of the groups from source are already in the target, run the following code to delete them. If the group belongs to any of default user accounts, don't delete it. This step is optional, you may choose to not delete those groups if you prefer to retain them as is.
+
+# In[12]:
+
+
+for tg in target_groups:
+    for sg in source_groups:
+        if sg.title == tg.title and (not tg.owner.startswith('esri_')):
+            print("Cleaning up group {} in target Portal...".format(tg.title))
+            tg.delete()
+            break
+
+
+# ## Copy Groups
+# 
+# Let us create a function that will clone the groups one at a time. As you call this function in a loop for each group, it reads the source group's properties, downloads thumbnail into a temporary file then creates a similar named group on target and applies those properties and thumbnail. If one of your portals is an organization on ArcGIS Online and other is an ArcGIS Enterprise, certain privacy properties need to be adapted. This function takes care of that. After creating the group, it finds which users were members of it and adds them appropriately.
+
+# In[13]:
+
+
+import tempfile
+
+GROUP_COPY_PROPERTIES = ['title', 'description', 'tags', 'snippet', 'phone',
+                         'access', 'isInvitationOnly']
+
+def copy_group(target, source, source_group):
+    
+    with tempfile.TemporaryDirectory() as temp_dir:
+        try:
+            target_group = {}
+
+            for property_name in GROUP_COPY_PROPERTIES:
+                target_group[property_name] = source_group[property_name]
+
+            if source_group['access'] == 'org' and target.properties['portalMode'] == 'singletenant':
+                #cloning from ArcGIS Online to ArcGIS Enterprise
+                target_group['access'] = 'public'
+
+            elif source_group['access'] == 'public'\
+                 and source.properties['portalMode'] == 'singletenant'\
+                 and target.properties['portalMode'] == 'multitenant'\
+                 and 'id' in target.properties:
+                    #cloning from ArcGIS Enterprise to ArcGIS Online org
+                    target_group['access'] = 'org'
+
+            # Download the thumbnail (if one exists)
+            thumbnail_file = None
+            if 'thumbnail' in group:
+                target_group['thumbnail'] = group.download_thumbnail(temp_dir)
+
+            # Create the group in the target portal
+            copied_group = target.groups.create_from_dict(target_group)
+
+            # Reassign all groups to correct owners, add users, and find shared items
+            members = group.get_members()
+            if not members['owner'] == target_admin_username:
+                copied_group.reassign_to(members['owner'])
+            if members['users']:
+                copied_group.add_users(members['users'])
+            return copied_group
+        except:
+            print("Error creating " + source_group['title'])
+
+
+# For each group in source portal, make a corresponding group in target portal.
+
+# In[14]:
+
+
+from IPython.display import display
+for group in source_groups:
+    target_group = copy_group(target, source, group)
+    if target_group:
+        display(target_group)
+
+
+# As you can see, we were able to add the groups with their thumbnails. Now let us verify that groups can be listed on the target portal:
+
+# In[15]:
+
+
+target_groups = target.groups.search()
+target_groups
+
+
+# With this part of the sample, we have successfully created users, groups and added the appropriate users to these groups. Thus, you can call the `get_members()` method one of the groups to view its members:
+
+# In[17]:
+
+
+group1 = target_groups[0]
+group1.get_members()
+
+
+# # Items
+
+# Copying items consists of multiple steps as explained in the following section of the sample:
+# 
+#  1. [For each user create a mapping of itemId to the `Item`](#For-each-user-create-a-mapping-of-itemId-to-the-Item)
+#  2. [Prepare sharing information for each item](#Prepare-sharing-information-for-each-item)
+#    1. [Print a mapping of item and its group membership](#Print-a-mapping-of-item-and-its-group-membership)
+#  3. [Copy items one by one](#Copy-Items)
+#  4. [Establish relationship between items](#establish-relationship-between-items)
+
+# ## For each user create a mapping of itemId to the `Item`
+# Do this for every folder in the user's account on the source portal
+
+# In[18]:
+
+
+source_items_by_id = {}
+for user in source_users:
+    num_items = 0
+    num_folders = 0
+    print("Collecting item ids for {}".format(user.username), end="\t\t")
+    user_content = user.items()
+    
+    # Get item ids from root folder first
+    for item in user_content:
+        num_items += 1
+        source_items_by_id[item.itemid] = item 
+    
+    # Get item ids from each of the folders next
+    folders = user.folders
+    for folder in folders:
+        num_folders += 1
+        folder_items = user.items(folder=folder['title'])
+        for item in folder_items:
+            num_items += 1
+            source_items_by_id[item.itemid] = item
+    
+    print("Number of folders {} # Number of items {}".format(str(num_folders), str(num_items)))
+
+
+# Let us print the dictionary of `{item_id : Item object}`
+
+# In[19]:
+
+
+source_items_by_id
+
+
+# ## Prepare sharing information for each item
+# Using the dictionary we created above, find to which groups are each of the items shared to.
+
+# In[20]:
+
+
+for group in source_groups:
+    #iterate through each item shared to the source group
+    for group_item in group.content():
+        try:
+            #get the item
+            item = source_items_by_id[group_item.itemid]
+            if item is not None:
+                if not 'groups'in item:
+                    item['groups'] = []
+                
+                #assign the target portal's corresponding group's name
+                item['groups'].append(group['title'])
+        except:
+            print("Cannot find item : " + group_item.itemid)
+
+
+# ### Print a mapping of item and its group membership
+
+# In[21]:
+
+
+for key in source_items_by_id.keys():
+    item = source_items_by_id[key]
+    print("\n{:40s}".format(item.title), end = " # ")
+    if 'groups' in item:
+        print(item.access, end = " # ")
+        print(item.groups, end = "")
+
+
+# As we can see from above, some items are shared to a few groups while some are not.
+
+# ## Copy Items
+# Below we define a function that you can call in a loop for each item in the dictionary we composed earlier. If the item is a text based item such as a Web Map or a file based item such as a layer package, it downloads the item's data to a temporary directory and uses that for creating the target item during cloning. You can find the [exhaustive list of different items](http://doc.arcgis.com/en/arcgis-online/reference/supported-items.htm) that you can upload to your portal and their corresponding item types from the [REST API documentation](http://resources.arcgis.com/en/help/arcgis-rest-api/index.html#/Items_and_item_types/02r3000000ms000000/). For brevity, this sample covers only a subset of those items. Note, if the item points to a web layer URL, the target item would also point to the same URL.
+
+# In[23]:
+
+
+TEXT_BASED_ITEM_TYPES = frozenset(['Web Map', 'Feature Service', 'Map Service','Web Scene',
+                                   'Image Service', 'Feature Collection', 
+                                   'Feature Collection Template',
+                                   'Web Mapping Application', 'Mobile Application', 
+                                   'Symbol Set', 'Color Set',
+                                   'Windows Viewer Configuration'])
+
+FILE_BASED_ITEM_TYPES = frozenset(['File Geodatabase','CSV', 'Image', 'KML', 'Locator Package',
+                                  'Map Document', 'Shapefile', 'Microsoft Word', 'PDF',
+                                  'Microsoft Powerpoint', 'Microsoft Excel', 'Layer Package',
+                                  'Mobile Map Package', 'Geoprocessing Package', 'Scene Package',
+                                  'Tile Package', 'Vector Tile Package'])
+
+ITEM_COPY_PROPERTIES = ['title', 'type', 'typeKeywords', 'description', 'tags',
+                        'snippet', 'extent', 'spatialReference', 'name',
+                        'accessInformation', 'licenseInfo', 'culture', 'url']
+
+
+# We define the copy function for items below. This function gets the properties of the item from source and applies it to the target. If the items were saved inside a folder, it creates that folder on the target as well. Finally, it sets the privacy (sharing) properties similar to how it was on the source portal.
+
+# In[24]:
+
+
+def copy_item(target, source_item):
+    try:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            item_properties = {}
+            for property_name in ITEM_COPY_PROPERTIES:
+                item_properties[property_name] = source_item[property_name]
+
+            data_file = None
+            
+            if source_item.type in TEXT_BASED_ITEM_TYPES:
+                # If its a text-based item, then read the text and add it to the request.
+                text = source_item.get_data(False)
+                item_properties['text'] = text
+            
+            elif source_item.type in FILE_BASED_ITEM_TYPES:
+                # download data and add to the request as a file
+                data_file = source_item.download(temp_dir)
+
+            thumbnail_file = source_item.download_thumbnail(temp_dir)
+            metadata_file = source_item.download_metadata(temp_dir)
+
+            #find item's owner
+            source_item_owner = source.users.search(source_item.owner)[0]
+            
+            #find item's folder
+            item_folder_titles = [f['title'] for f in source_item_owner.folders 
+                                  if f['id'] == source_item.ownerFolder]
+            folder_name = None
+            if len(item_folder_titles) > 0:
+                folder_name = item_folder_titles[0]
+
+            #if folder does not exist for target user, create it
+            if folder_name:
+                target_user = target.users.search(source_item.owner)[0]
+                target_user_folders = [f['title'] for f in target_user.folders
+                                       if f['title'] == folder_name]
+                if len(target_user_folders) == 0:
+                    #create the folder
+                    target.content.create_folder(folder_name, source_item.owner)
+            
+            # Add the item to the target portal, assign owner and folder
+            target_item = target.content.add(item_properties, data_file, thumbnail_file, 
+                                             metadata_file, source_item.owner, folder_name)
+            
+            #Set sharing (privacy) information
+            share_everyone = source_item.access == 'public'
+            share_org = source_item.access in ['org', 'public']
+            share_groups = []
+            if source_item.access == 'shared':
+                share_groups = source_item.groups
+            
+            target_item.share(share_everyone, share_org, share_groups)
+            
+            return target_item
+        
+    except Exception as copy_ex:
+        print("\tError copying " + source_item.title)
+        print("\t" + str(copy_ex))
+        return None
+
+
+# Copy over each item. While doing so, construct a dictionary mapping of source item's ID with target item's ID
+
+# In[25]:
+
+
+source_target_itemId_map = {}
+for key in source_items_by_id.keys():
+    source_item = source_items_by_id[key]
+
+    print("Copying {} \tfor\t {}".format(source_item.title, source_item.owner))
+    target_item = copy_item(target, source_item)
+    if target_item:
+        source_target_itemId_map[key] = target_item.itemid
+    else:
+        source_target_itemId_map[key] = None
+
+
+# We have successfully cloned all the items from source to target. We can query the contents of one of the users below to verify:
+
+# In[28]:
+
+
+user1 = target.users.search()[2]
+user1
+
+
+# In[30]:
+
+
+user1.items()
+
+
+# We could query the folders belonging to this user and the items within as well
+
+# In[31]:
+
+
+user1.folders
+
+
+# In[32]:
+
+
+user1.items(folder=user1.folders[0]['title'])
+
+
+# ## Establish relationship between items
+# 
+# So far, we have successfully cloned users, groups and items from source to target. Next, we will establish identical [relationships](http://resources.arcgis.com/en/help/arcgis-rest-api/index.html#/Relationship_types/02r3000000mm000000/) between items as they were in the source portal.
+
+# In[33]:
+
+
+RELATIONSHIP_TYPES = frozenset(['Map2Service', 'WMA2Code',
+                                'Map2FeatureCollection', 'MobileApp2Code', 'Service2Data',
+                                'Service2Service'])
+
+
+# Below, we loop through each item in source portal, find to which other item it is related and the type of that relationship. If a relationship is found, we find the corresponding items in target and establish the same relationship. To make this work, we will make use of the dictionary that maps the itemIds on source and target we created during the item clone stage. Let us take a look at that dictionary below:
+
+# In[40]:
+
+
+source_target_itemId_map
+
+
+# In[41]:
+
+
+for key in source_target_itemId_map.keys():
+    source_item = source_items_by_id[key]
+    target_itemid = source_target_itemId_map[key]
+    target_item = target.content.get(target_itemid)
+
+    print(source_item.title + " # " + source_item.type)
+    for relationship in RELATIONSHIP_TYPES:
+        try:
+            source_related_items = source_item.related_items(relationship)
+            for source_related_item in source_related_items:
+                print("\t\t" + source_related_item.title + " # " + 
+                      source_related_item.type +"\t## " + relationship)
+
+                #establish same relationship amongst target items
+                print("\t\t" + "establishing relationship in target portal", end=" ")
+                target_related_itemid = source_target_itemId_map[source_related_item.itemid]
+                target_related_item = target.content.get(target_related_itemid)
+                status = target_item.add_relationship(target_related_item, relationship)
+                print(str(status))
+        except Exception as rel_ex:
+            print("\t\t Error when checking for " + relationship + " : " + str(rel_ex))
+            continue
+
+
+# ## Conclusion
+# Thus, with this notebook, we have successfully cloned groups, users and their contents. Note, this notebook did not copy over the services that power the service based items. Such items continue to point to the same URL as the ones in source portal did. As long as those URLs remain accessible, the web maps and layer items continue to be usable.
+# 
+# To run this notebook as a Python script, checkout the Python scripts in the accompanying [SDK GitHub](https://github.com/Esri/arcgis-python-api/tree/master/samples/03_org_administrators) repository.
+
+
+# ====================
+# clone_storymap_version2.py
+# ====================
+
+#!/usr/bin/env python
+# coding: utf-8
+
+# # Copying an ArcGIS StoryMap item to another organization
+
+# <h1>Table of Contents<span class="tocSkip"></span></h1>
+# <div class="toc"><ul class="toc-item"><li><span><a href="#Copying-an-ArcGIS-StoryMap-item-to-another-organization" data-toc-modified-id="Copying-an-ArcGIS-StoryMap-item-to-another-organization-1"><span class="toc-item-num">1&nbsp;&nbsp;</span>Copying an ArcGIS StoryMap item to another organization</a></span><ul class="toc-item"><li><span><a href="#Introduction" data-toc-modified-id="Introduction-1.1"><span class="toc-item-num">1.1&nbsp;&nbsp;</span>Introduction</a></span></li><li><span><a href="#Import-Libraries" data-toc-modified-id="Import-Libraries-1.2"><span class="toc-item-num">1.2&nbsp;&nbsp;</span>Import Libraries</a></span></li><li><span><a href="#Define-function-to-export-all-the-Story-Map's-resources-to-a-zip-file" data-toc-modified-id="Define-function-to-export-all-the-Story-Map's-resources-to-a-zip-file-1.3"><span class="toc-item-num">1.3&nbsp;&nbsp;</span>Define function to export all the Story Map's resources to a zip file</a></span></li><li><span><a href="#Connect-to-the-source-and-destination-GIS-organizations" data-toc-modified-id="Connect-to-the-source-and-destination-GIS-organizations-1.4"><span class="toc-item-num">1.4&nbsp;&nbsp;</span>Connect to the source and destination GIS organizations</a></span></li><li><span><a href="#Step-1.-Get-the-ArcGIS-StoryMap-and-export-its-resources" data-toc-modified-id="Step-1.-Get-the-ArcGIS-StoryMap-and-export-its-resources-1.5"><span class="toc-item-num">1.5&nbsp;&nbsp;</span>Step 1. Get the <code>ArcGIS StoryMap</code> and export its resources</a></span></li><li><span><a href="#Step-2.-Get-the-StoryMap-Item's-data-to-extract-maps" data-toc-modified-id="Step-2.-Get-the-StoryMap-Item's-data-to-extract-maps-1.6"><span class="toc-item-num">1.6&nbsp;&nbsp;</span>Step 2. Get the <code>StoryMap</code> Item's <a href="https://developers.arcgis.com/rest/users-groups-and-items/item-data.htm" target="_blank">data</a> to extract maps</a></span></li><li><span><a href="#Step-3.-Create-a-new-StoryMap-item-in-the-Destination-GIS" data-toc-modified-id="Step-3.-Create-a-new-StoryMap-item-in-the-Destination-GIS-1.7"><span class="toc-item-num">1.7&nbsp;&nbsp;</span>Step 3. Create a new StoryMap item in the Destination <code>GIS</code></a></span></li><li><span><a href="#Step-4.-Add-the-StoryMap-resources" data-toc-modified-id="Step-4.-Add-the-StoryMap-resources-1.8"><span class="toc-item-num">1.8&nbsp;&nbsp;</span>Step 4. Add the <code>StoryMap</code> resources</a></span></li><li><span><a href="#Step-5.-Update-the-original-StoryMap-url" data-toc-modified-id="Step-5.-Update-the-original-StoryMap-url-1.9"><span class="toc-item-num">1.9&nbsp;&nbsp;</span>Step 5. Update the original <code>StoryMap</code> url</a></span></li><li><span><a href="#Step-6.-Transfer-Draft-Resources" data-toc-modified-id="Step-6.-Transfer-Draft-Resources-1.10"><span class="toc-item-num">1.10&nbsp;&nbsp;</span>Step 6. Transfer Draft Resources</a></span></li><li><span><a href="#Use-the-new-StoryMap!" data-toc-modified-id="Use-the-new-StoryMap!-1.11"><span class="toc-item-num">1.11&nbsp;&nbsp;</span>Use the new <code>StoryMap</code>!</a></span></li></ul></li></ul></div>
+
+# ## Introduction
+# 
+# Esri provides two models for telling stories with maps: The [Classic Story Map](https://storymaps-classic.arcgis.com/en/) and the newer [ArcGIS StoryMap](https://www.esri.com/en-us/arcgis/products/arcgis-storymaps/overview). Each offers the infrastructure to utilize ArcGIS Platform items such as [`Web Maps`](https://developers.arcgis.com/documentation/core-concepts/web-maps/) combined with supporting resources like images, text and videos for impactful storytelling. To answer your next question, please see [What's the Difference?](https://storymaps.arcgis.com/stories/6d3aff3f321f4f14b2f4ee29873c891b).
+# 
+# The platform stores each model differently, which leads to this sample document. The ArcGIS API for Python [`clone_items()`](https://developers.arcgis.com/python/api-reference/arcgis.gis.toc.html#arcgis.gis.ContentManager.clone_items) function equips you with all you need to effectively transfer many [Item](https://developers.arcgis.com/python/api-reference/arcgis.gis.toc.html#item) types between organizations, regardless of the organization's deployment. The `ArcGIS StoryMap` item is an exception to that currently. While there are plans to update `clone_items()` to handle the modern architecture behind `ArcGIS StoryMaps`, the sample below details a procedure to use immediately to transfer these items between organizations.
+# 
+# Let's proceed.
+
+# ## Import Libraries
+
+# In[1]:
+
+
+import os
+import uuid
+import json
+import shutil
+import tempfile
+
+from arcgis.gis import GIS
+from arcgis import __version__
+
+
+# Assign a variable to store appropriate version values to differentiate beween each story model.
+
+# In[2]:
+
+
+_version = [int(i) for i in __version__.split('.')]
+
+
+# ## Define function to export all the Story Map's resources to a zip file
+# 
+# Given its novel architecture and resource storage, we'll define a function to return the supporting resources for the ArcGIS StoryMap model.
+
+# In[3]:
+
+
+def export_resources(item, save_path=None, file_name=None):
+    """Export's the data's resources as a zip file"""
+    url = \
+        f'{item._gis._portal.resturl}content/users/{item._user_id}/items/{item.itemid}/resources/export'
+    if save_path is None:
+        save_path = tempfile.gettempdir()
+    if file_name is None:
+        file_name = f"{uuid.uuid4().hex[:6]}.zip"
+    params = {'f' : 'zip'}
+    con = item._gis._portal.con
+    resources = con.get(url, params=params,
+                        out_folder=save_path,
+                        file_name=file_name,
+                        try_json=False)
+    return resources
+
+
+# ## Connect to the source and destination GIS organizations
+
+# In[4]:
+
+
+gis = GIS(profile='your_online_profile', verify_cert=False)
+dest_gis = GIS(profile="your_online_admin_profile", verify_cert=False)
+
+
+# ## Step 1. Get the `ArcGIS StoryMap` and export its resources
+# Once we have the item, we can use the `_version` variable we created earlier to run the `export_resources()` function we wrote earlier for `ArcGIS StoryMaps`, or the item's `resources` instance to export the supporting resources for `Classic Story Maps`. In this instance, we'll run `export_resources()` since we're copying an `ArcGIS Story Map`. 
+
+# In[5]:
+
+
+story_map_id = "358b83b5f776402fa726cfa316aa197c"
+
+story_map = gis.content.get(story_map_id)
+if _version <= [1,8,2]:
+    resource = export_resources(item=story_map)
+else:
+    resource = story_map.resources.export()
+
+
+# In[6]:
+
+
+# Visualize the Story Map item details
+story_map
+
+
+# Examine the resources used by the Story Map
+
+# In[7]:
+
+
+resource
+
+
+# We can see the `resource` variable stores a path to a zip file containing all the supporting resources needed to reconstruct our original `ArcGIS StoryMap`.
+
+# ## Step 2. Get the `StoryMap` Item's [data](https://developers.arcgis.com/rest/users-groups-and-items/item-data.htm) to extract maps
+# 
+# `ArcGIS StoryMaps` utilize `Web Maps` and/or [Express Maps](https://doc.arcgis.com/en/arcgis-storymaps/author-and-share/add-maps.htm#ESRI_SECTION1_C30D73392D964D51A8B606128A8A6E8F) to contextualize the story's geography and allow direct interation with its mapped data. We can use the [`get_data()`](https://developers.arcgis.com/python/api-reference/arcgis.gis.toc.html#arcgis.gis.Item.get_data) method to extract each from the `StoryMap`.
+
+# In[1]:
+
+
+print(f"{'-'*80}")
+
+
+# In[8]:
+
+
+# Collect the Web Maps and Express Maps using the StoryMap's data. Use the set 
+# operator each item is collected only once for cloning.
+story_map_json = story_map.get_data(try_json=True)
+
+web_maps = set([v['data']['itemId'] for k, v in story_map_json['resources'].items() \
+                if v['type'].lower().find('webmap')>-1])
+express_maps = set([v['data']['itemId'] for k, v in story_map_json['resources'].items() \
+                    if v['type'].lower().find('expressmap')>-1])
+
+
+# Clone each `Web Map` from the `StoryMap` and assign a dictionary with the source `Web Map` id as the key, and the cloned `Web Map` id as the value. We'll use this dictionary to replace the source `Web Map` id with the cloned `Web Map` id in the new item we create in the destination GIS. 
+# 
+# Let's examine the Web Map(s) from the set we created above.
+
+# In[9]:
+
+
+webmap_mapper = {}
+for wm in web_maps:
+    webmap_to_copy = gis.content.get(wm)
+    cloned_webmaps = dest_gis.content.clone_items([webmap_to_copy]) # Clones the WebMap
+    webmap_mapper[webmap_to_copy.id] = [i for i in cloned_webmaps if i.type == 'Web Map'][0].id
+
+
+# The `clone_items()` function used above duplicates not only the `Web Map`, but also any [`Layers`](https://doc.arcgis.com/en/arcgis-online/reference/layers.htm) contained in it. Depending upon the type of layer in the `Web Map`, cloning will create corresponding items in the destination.
+# 
+# Let's examine the cloned output and quickly compare the item details to the original `Web Map`.
+
+# In[10]:
+
+
+cloned_webmaps
+
+
+# In[11]:
+
+
+cloned_webmaps[2]
+
+
+# Let's also look at our dictionary and then use it to remap the original `Web Map` id to the cloned `Web Map` id in the json structure resulting from the `get_data()` function run earlier.
+
+# In[12]:
+
+
+webmap_mapper
+
+
+# Remap the OLD ItemId to the New Item ID
+
+# In[13]:
+
+
+story_map_text = json.dumps(story_map_json)
+
+for k, v in webmap_mapper.items():
+    story_map_text = story_map_text.replace(k, v) # replace the IDs
+
+
+# ## Step 3. Create a new StoryMap item in the Destination `GIS`
+# 
+# We'll use the original `story_map` variable properties to create a new `item` in our destination `GIS`. We'll eventually add the `resource` zip file we created earlier to the item to essetially duplicate the original `StoryMap`.
+
+# In[14]:
+
+
+new_item = dest_gis.content.add({'type' : story_map.type,
+                                 'tags' : story_map.tags,
+                                 'title' : story_map.title,
+                                 'description' : story_map.description,
+                                 'typeKeywords' : story_map.typeKeywords,
+                                 'extent' : story_map.extent,
+                                 'text' :story_map_text}
+                                )
+
+
+# In[15]:
+
+
+new_item
+
+
+# Let's also download the original `item` thumbnail to use to update our new `item'.
+
+# In[16]:
+
+
+# orig_thumbnail = story_map.download_thumbnail(r"your/file/path")
+orig_thumbnail = story_map.download_thumbnail(r"C:/Job/sftriage/thumbnails/")
+
+
+# In[17]:
+
+
+new_item.update(thumbnail=orig_thumbnail)
+
+
+# In[18]:
+
+
+new_item
+
+
+# ## Step 4. Add the `StoryMap` resources
+# We exported the images, expressmaps, text or other resources associated with the `StoryMap` earlier in this sample. Let's add those using the `resource` variable where we stored that output.
+
+# In[19]:
+
+
+new_item.resources.add(resource,
+                       archive=True)
+
+
+# ## Step 5. Update the original `StoryMap` url
+# Set the `id` component of the new_`item`'s url to the new item `id` property. 
+
+# In[20]:
+
+
+new_item.update({'url': story_map.url.replace(story_map.id, new_item.id)})
+
+
+# ## Step 6. Transfer Draft Resources
+# 
+# `ArcGIS StoryMaps` support a workflow that enables you to make changes to a published story, preview those changes, and then republish to make those changes to the existing story. Such updates to published stories are stored as unpublished drafts and are not visible to the audience until you are ready to republish the story. 
+# 
+# The following code creates the supporting file to store draft resources and adds it as a supporting file to the destination `StoryMap`.
+
+# In[21]:
+
+
+with tempfile.NamedTemporaryFile(mode='w', suffix='.json', 
+                                 dir=tempfile.gettempdir(), 
+                                 delete=False) as jsonfile:
+    jsonfile.write(json.dumps(new_item.get_data()))
+    new_item.resources.add(file=jsonfile.name)
+    type_keywords = [tk for tk in new_item.typeKeywords if 'smdraftresourceid:' not in tk]
+    type_keywords.append(f'smdraftresourceid:{os.path.basename(jsonfile.name)}')
+    new_item.update({'typeKeywords' : type_keywords})
+
+
+# Draft express map resources are handled separately and added as a resource.
+
+# In[22]:
+
+
+if len(express_maps) > 0:
+    with tempfile.TemporaryDirectory() as d:
+        shutil.unpack_archive(filename=resource, extract_dir=d)
+        for expmap in express_maps:
+            express_draft = os.path.join(d, "draft_"+ expmap)
+            express_pub = os.path.join(d, "pub_" + expmap)
+            if os.path.isfile(express_pub):
+                shutil.copy(express_pub, express_draft)
+                new_item.resources.add(express_draft)
+
+
+# ## Use the new `StoryMap`!
+
+# In[23]:
+
+
+print("your new item can be found here: " + new_item.homepage)
+
+
+# In[24]:
+
+
+new_item
+
+
+# In[ ]:
+
+
+
+
+
+
+# ====================
+# examining_item_thumbnail_size.py
+# ====================
+
+#!/usr/bin/env python
+# coding: utf-8
+
+# # Examining Item Thumbnail Size
+
+# <h1>Table of Contents<span class="tocSkip"></span></h1>
+# <div class="toc"><ul class="toc-item"><li><span><a href="#Setting-Up-the-Notebook" data-toc-modified-id="Setting-Up-the-Notebook-1"><span class="toc-item-num">1&nbsp;&nbsp;</span>Setting Up the Notebook</a></span></li><li><span><a href="#About-Item-Thumbnails" data-toc-modified-id="About-Item-Thumbnails-2"><span class="toc-item-num">2&nbsp;&nbsp;</span>About Item Thumbnails</a></span><ul class="toc-item"><li><span><a href="#Finding-Missing-and-Invalid-Images" data-toc-modified-id="Finding-Missing-and-Invalid-Images-2.1"><span class="toc-item-num">2.1&nbsp;&nbsp;</span>Finding Missing and Invalid Images</a></span><ul class="toc-item"><li><span><a href="#Connect-to-the-GIS" data-toc-modified-id="Connect-to-the-GIS-2.1.1"><span class="toc-item-num">2.1.1&nbsp;&nbsp;</span>Connect to the GIS</a></span></li></ul></li></ul></li><li><span><a href="#Usage" data-toc-modified-id="Usage-3"><span class="toc-item-num">3&nbsp;&nbsp;</span>Usage</a></span><ul class="toc-item"><li><span><a href="#Example:-Retrieve-All-Thumbnails-Under-400x300" data-toc-modified-id="Example:-Retrieve-All-Thumbnails-Under-400x300-3.1"><span class="toc-item-num">3.1&nbsp;&nbsp;</span>Example: Retrieve All Thumbnails Under 400x300</a></span></li><li><span><a href="#Item-Thumbnails-Back-as-HTML-Report" data-toc-modified-id="Item-Thumbnails-Back-as-HTML-Report-3.2"><span class="toc-item-num">3.2&nbsp;&nbsp;</span>Item Thumbnails Back as HTML Report</a></span><ul class="toc-item"><li><span><a href="#Example:-Find-all-Images-Under-600x400-Pixels:" data-toc-modified-id="Example:-Find-all-Images-Under-600x400-Pixels:-3.2.1"><span class="toc-item-num">3.2.1&nbsp;&nbsp;</span>Example: Find all Images Under 600x400 Pixels:</a></span></li></ul></li></ul></li></ul></div>
+
+# ## Setting Up the Notebook
+# 
+# This notebook requires `Pillow` which is a fork of `PIL`.  To install this module run the cell below:
+
+# In[ ]:
+
+
+import sys
+prefix = '\"%s\"' %  sys.prefix
+get_ipython().system('conda install --yes --prefix {prefix} pillow')
+
+
+# ## About Item Thumbnails
+# 
+# A thumbnail image is created by default when you add the item to the site. It appears in galleries, search results, contents, and the item page. You can create and load a different image if the default image does not convey the information you want.
+# 
+# In ArcGIS Online, you can drag an image or browse to a file. For best results, add an image that is 600 pixels wide by 400 pixels high or larger with an aspect ratio of 1.5:1 in a web file format such as PNG, JPEG, or GIF. Pan and zoom to what you want to appear in your thumbnail. Depending on the size and resolution of your image file and how far you zoom in to customize the thumbnail, the image may be resampled and scaled when it's saved. If you add an image in GIF or JPEG format, it will be converted to PNG when it's saved.
+# 
+# ### Finding Missing and Invalid Images
+# 
+# This notebook shows how a user can find images under the 600x400 pixel size for a given user.
+
+# In[1]:
+
+
+import os
+import io
+import base64
+import shutil
+from getpass import getpass
+
+
+# In[2]:
+
+
+import pandas as pd
+from PIL import Image
+from IPython.display import HTML
+import ipywidgets as widgets
+from arcgis.gis import GIS, Item, User
+
+pd.set_option('display.max_colwidth', -1)
+
+
+# #### Connect to the GIS
+# 
+# Use the login credentials to your site to populate the interactive application below.
+
+# In[3]:
+
+
+username = getpass()
+password = getpass()
+
+
+# In[4]:
+
+
+gis = GIS(username=username, password=password, verify_cert=False)
+
+
+# In[12]:
+
+
+def get_images(username, gis, min_width=600, min_height=400, show_image=True):
+    """
+    Finds all images for a given user under a specific image size in pixels.
+    
+    ================   ===========================================
+    **Inputs**         **Description**
+    ----------------   -------------------------------------------
+    username           Required string. The name of the user items 
+                       to exmine.
+    ----------------   -------------------------------------------
+    gis                Required GIS. The connection to Portal/AGOL
+    ----------------   -------------------------------------------
+    min_height         Optional Integer. The height in pixels of 
+                       the image. Any image below this height will 
+                       be returned in the dataframe.
+    ----------------   -------------------------------------------
+    min_width          Optional Integer. The width of the image. 
+                       Anything below this width will be returned.
+    ----------------   -------------------------------------------
+    show_image         Optional boolean. If True, the results will 
+                       be returned as an HTML table. Else, they 
+                       will be returned as a pandas DataFrame.
+    ================   ===========================================
+    
+    returns: string or pd.DataFrame
+    
+    """
+    results = []
+    show_image_columns=['title', 'username','folder', 'item_id', 'item_thumbnail','width', 'height']
+    no_show_image_columns=['title', 'username','folder', 'item_id', 'width', 'height']
+    user = gis.users.get(username)
+    username = user.username
+    folders = [fld['title'] for fld in user.folders] + [None]
+    for folder in folders:
+        items = user.items(folder=folder, max_items=1000)
+        for item in items:
+            thumbnail = item.thumbnail
+            if show_image:
+                if thumbnail:
+                    bn = os.path.basename(thumbnail)
+                    image_bytes = item.get_thumbnail()
+                    img = Image.open(io.BytesIO(image_bytes))
+                    b64_item = base64.b64encode(image_bytes)
+                    b64thmb = "data:image/png;base64," + str(b64_item,"utf-8") + "' width='200' height='133"
+                    item_thumbnail = """<img src='""" + str(b64thmb) + """' class="itemThumbnail">"""
+                    results.append([item.title, username, folder, item.id, item_thumbnail] + list(img.size))
+                    img.close()
+                    del img
+                else:
+                    results.append([item.title, username, folder, item.id, "", -999,-999])
+            else:
+                if thumbnail:
+                    image_bytes = item.get_thumbnail()
+                    img = Image.open(io.BytesIO(image_bytes))
+                    results.append([item.title, username, folder, item.id] + list(img.size))
+                    img.close()
+                    del img
+                else:
+                    results.append([item.title, username, folder, item.id,None,None])
+    
+    if show_image:
+        df = pd.DataFrame(results, columns=show_image_columns)
+        q = (df.width <= float(min_width)) | (df.height < float(min_height)) | (df.height.isnull()) | (df.width.isnull())
+        df = (df[q]
+              .copy()
+              .reset_index(drop=True))
+        return HTML(df.to_html(escape=False))
+    else:
+        df = pd.DataFrame(results, columns=no_show_image_columns)
+        q = (df.width <= float(min_width)) | (df.height < float(min_height)) | (df.height.isnull()) | (df.width.isnull())
+        df = (df[q]
+              .copy()
+             .reset_index(drop=True))
+        return df
+
+
+# ## Usage
+# 
+# To get a DataFrame that can be queried, set `show_image` to `False`.  This will return an object that can be further used for analysis.  The dataframe reports back the width/height of the image.  If an image is missing, the value will be **NaN** for width/height.  
+# 
+# ### Example: Retrieve All Thumbnails Under 400x300
+
+# In[18]:
+
+
+username = "geodev0"
+df = get_images(username, gis=gis, 
+                min_height=300, min_width=400, 
+                show_image=False)
+df
+
+
+# ### Item Thumbnails Back as HTML Report
+# 
+# Sometimes just creating a table to see what is there is good enough.  By setting `show_image` to `True`, the method allows for a quick visualization approach to the thumbnail problem.  
+# 
+# #### Example: Find all Images Under 600x400 Pixels:
+
+# In[19]:
+
+
+df = get_images(username, gis=gis, 
+                show_image=True)
+df
+
+
+
+# ====================
+# find-top-n-items-in-your-org.py
+# ====================
+
+#!/usr/bin/env python
+# coding: utf-8
+
+# # Find the top 'n' items in your org
+# 
+
+# Administrators often find themselves having to search and list items in their organization that match certain criteria. They might need this information for different administrative or auditing purposes. An example of such is to find items modified within the last 'n' days and sort them by their popularity or number of views. This notebook will work through such a use case of finding the top `100` public **[ArcGIS Dashboard](https://www.esri.com/en-us/arcgis/products/arcgis-dashboards/overview)** items sorted by **number of views** and output the results into a CSV file that can be used for reporting or ingested into any other system.
+# 
+# The configurations needed for this notebook are in the top few cells. While this exact use case may not be what you need, you can easily modify the configuration cells and adopt it to suit your reporting needs.
+
+# <h1>Table of Contents<span class="tocSkip"></span></h1>
+# <div class="toc"><ul class="toc-item"><li><span><a href="#Import-arcgis-and-other-libraries" data-toc-modified-id="Import-arcgis-and-other-libraries-1">Import <code>arcgis</code> and other libraries</a></span></li><li><span><a href="#Set-up-search-parameters" data-toc-modified-id="Set-up-search-parameters-2">Set up search parameters</a></span></li><li><span><a href="#Search-for-ArcGIS-Dashboard-items" data-toc-modified-id="Search-for-ArcGIS-Dashboard-items-3">Search for ArcGIS Dashboard items</a></span></li><li><span><a href="#Compose-a-table-from-search-results" data-toc-modified-id="Compose-a-table-from-search-results-4">Compose a table from search results</a></span></li><li><span><a href="#Exploratory-analysis-on-the-top-'n'-items" data-toc-modified-id="Exploratory-analysis-on-the-top-'n'-items-5">Exploratory analysis on the top 'n' items</a></span><ul class="toc-item"><li><span><a href="#Make-a-word-cloud-out-of-the-item-titles" data-toc-modified-id="Make-a-word-cloud-out-of-the-item-titles-5.1">Make a word cloud out of the item titles</a></span></li></ul></li><li><span><a href="#Write-the-table-to-a-CSV-in-your-'files'-location" data-toc-modified-id="Write-the-table-to-a-CSV-in-your-'files'-location-6">Write the table to a CSV in your 'files' location</a></span></li><li><span><a href="#Conclusion" data-toc-modified-id="Conclusion-7">Conclusion</a></span></li></ul></div>
+
+# ## Import `arcgis` and other libraries
+
+# In[1]:
+
+
+from arcgis.gis import GIS
+from datetime import datetime, timedelta, timezone
+from dateutil import tz
+import pandas as pd
+import matplotlib.pyplot as plt
+from matplotlib.dates import DateFormatter
+from IPython.display import display
+import os
+gis = GIS("home")
+
+
+# ## Set up search parameters
+
+# In[2]:
+
+
+# set up time zone for searching - 'PDT' in this example
+la_tz = tz.gettz('America/Los_Angeles')
+
+# set up a time filter - last 20 days in this example
+end_time = datetime.now(tz=la_tz)
+start_time = end_time - timedelta(days=20)
+
+# sort order
+search_sort_order = 'desc'
+
+# search outside org?
+search_outside_org = True
+
+# number of items to search for
+search_items_max = 100
+
+# search item type
+search_item_type = "Dashboard"
+
+# output location
+out_folder = '/arcgis/home/dashboard_counts'
+
+
+# ArcGIS stores the `created` and `modified` times for items as [Unix Epoch](https://en.wikipedia.org/wiki/Unix_time) millisecond timestamps in [UTC time zone](https://en.wikipedia.org/wiki/Coordinated_Universal_Time). The next cell will convert the start and end times to UTC timezone and then to Epoch. We multiply by 1000 to convert seconds to milliseconds.
+
+# In[3]:
+
+
+end_time_epoch = end_time.astimezone(tz.UTC).timestamp()*1000
+start_time_epoch = start_time.astimezone(tz.UTC).timestamp()*1000
+
+# print settings
+print(f'Time zone used: {end_time.tzname()}')
+print(f'start time: {start_time} | as epoch: {start_time_epoch}')
+print(f'end time: {end_time} | as epoch: {end_time_epoch}')
+
+
+# ## Search for ArcGIS Dashboard items
+# 
+# Next, we will construct a search query using the parameters defined above and query the org. To learn about the different parameters you can query for, [see the search reference](http://bitly.com/1fJ8q31). You can combine this reference with the properties of Items [found here](https://developers.arcgis.com/rest/users-groups-and-items/item.htm) to construct complex queries.
+# 
+# Since our org does not have over 100 Dashboard items, for the purpose of illustration, we search across all of ArcGIS Online.
+
+# In[4]:
+
+
+query_string = f'modified: [{start_time_epoch} TO {end_time_epoch}]'
+
+# search 100 most popular ArcGIS Dashboard items across all of ArcGIS Online
+search_result = gis.content.search(query=query_string, item_type=search_item_type, 
+                                   sort_field='numViews', sort_order=search_sort_order,
+                                   max_items=search_items_max, outside_org=search_outside_org)
+len(search_result)
+
+
+# ## Compose a table from search results
+# Our next step is to compose a Pandas DataFrame object from the search result. For this, we will compose a list of dictionary objects from the search results and choose important item properties such as item ID, title, URL, created time, view counts etc.
+
+# In[5]:
+
+
+get_ipython().run_cell_magic('time', '', "result_list = []\n\nfor current_item in search_result:\n    result_dict = {}\n    result_dict['item_id'] = current_item.id\n    result_dict['num_views'] = current_item.numViews\n    result_dict['title'] = current_item.title\n    \n    # process creation date\n    date_modified = datetime.fromtimestamp(current_item.modified/1000, tz=tz.UTC)\n    result_dict['date_modified'] = date_modified\n    \n    result_dict['url'] = current_item.homepage\n    \n    # append to list\n    result_list.append(result_dict)\n")
+
+
+# In[6]:
+
+
+df = pd.DataFrame(data=result_list)
+
+
+# Print the table's top 5 and bottom 5 rows
+
+# In[7]:
+
+
+df.head() # top 5
+
+
+# In[8]:
+
+
+df.tail() # bottom 5
+
+
+# ## Exploratory analysis on the top 'n' items
+
+# Now that we can collected our data, let us explore it. First we create a histogram of the number of views to look at the distribution.
+
+# In[9]:
+
+
+fig, ax = plt.subplots(figsize=(10,6))
+(df['num_views']/1000000).hist(bins=50)
+ax.set_title(f'Histogram of view counts of top {search_items_max} ArcGIS {search_item_type} items')
+ax.set_xlabel('Number of views in millions');
+
+
+# Most items in the top `100` list have less than one million views. We have a few outliers that have over a billion and one that is nearing a trillion views. We can find what those items are, simply by displaying the top few Item objects.
+
+# In[10]:
+
+
+for current_item in search_result[:4]:
+    display(current_item)
+
+
+# Next, let us visualize the last modified date as a histogram. The `date_modified` column is read as a `DateTime` object with minute and second level data. We will resample this column and aggregate on a per day basis. The cell below uses `Pandas` `resample()` method for the same.
+
+# In[11]:
+
+
+df2 = df.resample(rule='1D', on='date_modified')  # resample to daily intervals
+last_modified_counts = df2['item_id'].count()
+
+# simplify date formatting
+last_modified_counts.index = last_modified_counts.index.strftime('%m-%d')
+
+# plot last modified dates as a histogram
+fig, ax = plt.subplots(figsize=(15,6))
+last_modified_counts.plot(kind='bar', ax=ax)
+ax.set(xlabel = 'Dates',
+      title='Number of items modified in the last 20 days')
+plt.xticks(rotation='horizontal');
+
+
+# ### Make a word cloud out of the item titles
+# 
+# To make a word cloud, we use a library called `wordcloud`. As of this notebook, this library is not part of the default set of libraries available in the ArcGIS Notebook environment. However, you can easily install it as shown below:
+
+# In[12]:
+
+
+get_ipython().system('pip install wordcloud')
+
+
+# Next we collect title strings from all the items and join them into a long paragraph.
+
+# In[13]:
+
+
+get_ipython().run_cell_magic('time', '', "title_series = df['title'].dropna()\ntitle_list = list(title_series)\ntitle_paragraph = '. '.join(title_list)\ntitle_paragraph\n")
+
+
+# In[14]:
+
+
+from wordcloud import WordCloud
+wc = WordCloud(width=1000, height=600, background_color='white')
+
+
+# In[16]:
+
+
+wc_img = wc.generate_from_text(title_paragraph)
+
+plt.figure(figsize=(20,10))
+plt.imshow(wc_img, interpolation="bilinear")
+plt.axis('off')
+plt.title('What are the top 100 ArcGIS Dashboard items about?');
+
+
+# Not surprisingly, most items are about the Novel Coronavirus. The word 'Dashboard' also appears pretty frequently enough.
+
+# ## Write the table to a CSV in your 'files' location
+# We create a folder defined earlier in the configuration section of this notebook to store a `CSV` file containing the items table.
+
+# In[17]:
+
+
+# create a folder for these files if it does not exist
+
+if not os.path.exists(out_folder):
+    os.makedirs(out_folder)
+    print(f'Created output folder at: {out_folder}')
+else:
+    print(f'Using existing output folder at: {out_folder}')
+
+
+# In[18]:
+
+
+# append timestamp to filename to make it unique
+output_filename = f"top_dash_items_{start_time.strftime('%m-%d-%y')}_to_{end_time.strftime('%m-%d-%y')}"
+
+# write table to csv
+df.to_csv(os.path.join(out_folder, output_filename))
+print('Output csv created at : ' + os.path.join(out_folder, output_filename))
+
+
+# ## Conclusion
+
+# This notebook demonstrated how to use the ArcGIS API for Python library to construct a search query and search for items in your org (or outside it). The notebook also demonstrated how to work with timezones, `datetime` objects and how to explore the meta data of the items collected. The notebook concludes by writing the table as a CSV on disk. If this kind of workflow needs to be repeated at set intervals, you can easily do so by [scheduling your notebook](https://enterprise.arcgis.com/en/notebook/latest/administer/windows/automate-notebook-execution.htm) to run at set intervals.
+
+
+# ====================
+# inventory-organizational-content.py
+# ====================
+
+#!/usr/bin/env python
+# coding: utf-8
+
+# # Inventory Organizational Content
+
+# Being able to retrieve, display, analyze, and export the content within an organization Portal are important tasks for any admin. Here we will leverage the [ContentManager](https://developers.arcgis.com/python/api-reference/arcgis.gis.toc.html#contentmanager) and [UserManager](https://developers.arcgis.com/python/api-reference/arcgis.gis.toc.html#usermanager) classes of the GIS module, as well as some functionality from the [Pandas](https://pandas.pydata.org/docs/index.html) library, to accomplish those tasks.
+
+# <h1>Table of Contents<span class="tocSkip"></span></h1>
+# <div class="toc"><ul class="toc-item"><li><span><a href="#Inventory-Organizational-Content" data-toc-modified-id="Inventory-Organizational-Content-1"><span class="toc-item-num">1&nbsp;&nbsp;</span>Inventory Organizational Content</a></span><ul class="toc-item"><li><span><a href="#Import-Libraries" data-toc-modified-id="Import-Libraries-1.1"><span class="toc-item-num">1.1&nbsp;&nbsp;</span>Import Libraries</a></span></li><li><span><a href="#Connect-to-ArcGIS-Online" data-toc-modified-id="Connect-to-ArcGIS-Online-1.2"><span class="toc-item-num">1.2&nbsp;&nbsp;</span>Connect to ArcGIS Online</a></span></li><li><span><a href="#Querying-Content" data-toc-modified-id="Querying-Content-1.3"><span class="toc-item-num">1.3&nbsp;&nbsp;</span>Querying Content</a></span><ul class="toc-item"><li><span><a href="#Searching-for-Content" data-toc-modified-id="Searching-for-Content-1.3.1"><span class="toc-item-num">1.3.1&nbsp;&nbsp;</span>Searching for Content</a></span></li><li><span><a href="#Displaying-Content" data-toc-modified-id="Displaying-Content-1.3.2"><span class="toc-item-num">1.3.2&nbsp;&nbsp;</span>Displaying Content</a></span></li><li><span><a href="#Sorting-Content" data-toc-modified-id="Sorting-Content-1.3.3"><span class="toc-item-num">1.3.3&nbsp;&nbsp;</span>Sorting Content</a></span></li></ul></li><li><span><a href="#Querying-Organization-Content" data-toc-modified-id="Querying-Organization-Content-1.4"><span class="toc-item-num">1.4&nbsp;&nbsp;</span>Querying Organization Content</a></span><ul class="toc-item"><li><span><a href="#Searching-for-Organization-Members" data-toc-modified-id="Searching-for-Organization-Members-1.4.1"><span class="toc-item-num">1.4.1&nbsp;&nbsp;</span>Searching for Organization Members</a></span></li><li><span><a href="#Getting-Member-Content" data-toc-modified-id="Getting-Member-Content-1.4.2"><span class="toc-item-num">1.4.2&nbsp;&nbsp;</span>Getting Member Content</a></span></li><li><span><a href="#Compiling-Organization-Content" data-toc-modified-id="Compiling-Organization-Content-1.4.3"><span class="toc-item-num">1.4.3&nbsp;&nbsp;</span>Compiling Organization Content</a></span></li></ul></li><li><span><a href="#Analyzing-Organization-Content-with-Pandas" data-toc-modified-id="Analyzing-Organization-Content-with-Pandas-1.5"><span class="toc-item-num">1.5&nbsp;&nbsp;</span>Analyzing Organization Content with Pandas</a></span><ul class="toc-item"><li><span><a href="#Filtering-the-Dataset" data-toc-modified-id="Filtering-the-Dataset-1.5.1"><span class="toc-item-num">1.5.1&nbsp;&nbsp;</span>Filtering the Dataset</a></span></li><li><span><a href="#Accessing-Content-by-ID" data-toc-modified-id="Accessing-Content-by-ID-1.5.2"><span class="toc-item-num">1.5.2&nbsp;&nbsp;</span>Accessing Content by ID</a></span></li></ul></li><li><span><a href="#Exporting-Data" data-toc-modified-id="Exporting-Data-1.6"><span class="toc-item-num">1.6&nbsp;&nbsp;</span>Exporting Data</a></span></li></ul></li></ul></div>
+
+# ## Import Libraries
+
+# In[1]:
+
+
+import pandas as pd
+from IPython.display import display
+
+import arcgis
+from arcgis.gis import GIS
+
+
+# ## Connect to ArcGIS Online
+
+# In[3]:
+
+
+profile_name = "my_dev_profile"
+
+gis = GIS(profile=profile_name)
+gis.users.me
+
+
+# ## Querying Content
+
+# To search for content within our organization, we can access the [ContentManager](https://developers.arcgis.com/python/api-reference/arcgis.gis.toc.html#arcgis.gis.ContentManager) class via `gis.content()`. 
+# 
+# Using the [`advanced_search()`](https://developers.arcgis.com/python/api-reference/arcgis.gis.toc.html#arcgis.gis.ContentManager.advanced_search) method, we can query content belonging to a user by providing the string `"owner: < username >"`. By setting the `return_count` parameter of `advanced_search()` to `True`, we can simply return a single integer representing the number of items which that user owns.
+# 
+# Let's return the number of items that belong to the user currently logged in:
+
+# In[4]:
+
+
+qe = f"owner: {gis.users.me.username}"
+my_content_count = gis.content.advanced_search(query=qe,return_count=True)
+print(my_content_count, 'items found for current user')
+
+
+# ### Searching for Content
+
+# If we leave the `return_count` parameter as its default value `False`, then we will receive a response dictionary containing metadata about the query as well as a list of returned items in the `results` field.
+# 
+# By setting the `max_items` parameter, we can limit the number of items that are returned in the `results` field.
+
+# In[5]:
+
+
+max_items = 3
+user_content = gis.content.advanced_search(query=qe, max_items=max_items)
+user_content
+
+
+# ### Displaying Content
+
+# In[6]:
+
+
+# Displaying the result items through IPython.display.display()
+
+for item in user_content['results']:
+    display(item)
+
+
+# It is also possible to have these items returned as dictionary objects by setting the `as_dict` parameter:
+
+# In[7]:
+
+
+# return items as a dictionary with as_dict=True
+
+user_content_as_dict = gis.content.advanced_search(
+    query=qe, max_items=max_items,as_dict=True)
+user_content_as_dict['results']
+
+
+# ### Sorting Content
+
+# The `sort_field` and `sort_order` parameters of the [`advanced_search()`](https://developers.arcgis.com/python/api-reference/arcgis.gis.toc.html#arcgis.gis.ContentManager.advanced_search) method can be used to sort the returned content server side.
+# 
+# Possible values for `sort_order` are `"asc"` for ascending or increasing order and `"desc"` for descending or decreasing order. Default values for the `sort_field` and `sort_order` parameters are `"title"` and `"asc"`, respectively.
+# 
+# In this next example we'll search for the last 3 items that the current user modified by setting `sort_field="modified"` and `sort_order="desc"`:
+
+# In[8]:
+
+
+content_last_modified = gis.content.advanced_search(
+    query=qe, max_items=max_items, sort_field="modified", sort_order="desc")
+
+for item in content_last_modified['results']:
+    display(item)
+
+
+# Here we return the first 3 items that the user created by setting `sort_field="created"` and `sort_order="asc"`:
+
+# In[9]:
+
+
+content_first_created = gis.content.advanced_search(query=qe, max_items=max_items, sort_field="created", sort_order="asc")
+
+for item in content_first_created['results']:
+    display(item)
+
+
+# ## Querying Organization Content
+
+# ### Searching for Organization Members
+
+# We can search for a list of the members within the organization by using the [UserManager](https://developers.arcgis.com/python/api-reference/arcgis.gis.server.html#arcgis.gis.server.UserManager) class within the GIS module. Here we access the UserManager by calling `gis.users`, and use the [`search()`](https://developers.arcgis.com/python/api-reference/arcgis.gis.toc.html#arcgis.gis.UserManager.search) method to return a list of organization members. The `search()` method will return all users in the organization if no parameters are provided:
+
+# In[10]:
+
+
+# View UserManager object
+gis.users
+
+
+# In[11]:
+
+
+org_users = gis.users.search()
+print(f'{len(org_users)} users found')
+org_users[:3]
+
+
+# In[12]:
+
+
+# Display a misc member
+org_member = org_users[1]
+org_member
+
+
+# ### Getting Member Content
+
+# Similarly to above, we can set `return_count=True` and see how many items this user has:
+
+# In[13]:
+
+
+# See the number of member items
+qe = "owner: " + org_member.username
+member_content_count = gis.content.advanced_search(
+    query=qe, max_items=-1, return_count=True)
+print(f"Org member has {member_content_count} items")
+
+
+# In[14]:
+
+
+# Return <max_items> items from member
+max_items = 3
+
+member_content = gis.content.advanced_search(query=qe, max_items=max_items)
+member_content['results']
+
+
+# ### Compiling Organization Content
+
+# If we return all items for each user in the organization, we can compile those items into a single list representing all of the organizations content.
+# 
+# We can remove the item limit for each query by setting `max_items=-1` in the `advanced_search()` function:
+
+# In[15]:
+
+
+# return content for each user in org, compile into a single list
+
+org_content = []
+
+for user in org_users:
+    qe = f"owner: {user.username}"
+    user_content = gis.content.advanced_search(query=qe, max_items=-1)['results']
+    org_content += user_content
+    
+print(f"{len(org_content)} items found in org")
+
+
+# ## Analyzing Organization Content with Pandas
+
+# Let's put our compiled list into a pandas [DataFrame](https://pandas.pydata.org/docs/reference/api/pandas.DataFrame.html) to easily view and filter our data
+
+# In[16]:
+
+
+# Create DataFrame
+
+content_df = pd.DataFrame(org_content)
+content_df.head()
+
+
+# We can use the pandas function [`value_counts()`](https://pandas.pydata.org/docs/reference/api/pandas.Series.value_counts.html#pandas.Series.value_counts) to see how many occurrences there are of each value for a particular column. Here we return the top 10 most frequently occurring item types and the number of instances they have:
+
+# In[17]:
+
+
+# use value_counts() to see how many items you have with a particular key:value pair
+content_df.type.value_counts().head(10)
+
+
+# Another [`value_counts()`](https://pandas.pydata.org/docs/reference/api/pandas.Series.value_counts.html#pandas.Series.value_counts) example where we see the distribution of access levels for each of the items in the organization:
+
+# In[18]:
+
+
+content_df.access.value_counts()
+
+
+# Using the [`value_counts()`](https://pandas.pydata.org/docs/reference/api/pandas.Series.value_counts.html#pandas.Series.value_counts) function in conjunction with the [`groupby()`](https://pandas.pydata.org/docs/reference/api/pandas.DataFrame.groupby.html) operation allows for an additional level of analysis. Here we see the breakdown of item types that each user has created:
+
+# In[19]:
+
+
+content_df.groupby('owner').type.value_counts().head(10)
+
+
+# In[20]:
+
+
+# Viewing the number item types per access level within the org
+content_df.groupby('type').access.value_counts().head(10)
+
+
+# ### Filtering the Dataset
+
+# We can choose which columns we'd like to view, and the order we'd like to view them in, by providing the DataFrame with a list of strings matching column names:
+
+# In[21]:
+
+
+view_columns = ['id','title','owner','type','access']
+content_df[view_columns].head()
+
+
+# Creating and applying Boolean masks is a very efficient way to the filter the rows of a DataFrame. By using standard operators such as `<`, `>`, `==` and `!=` on pandas Series objects (e.g. the columns of our DataFrame), we can create a new Series of `True` and `False` values, called a mask. When this mask is applied to the original DataFrame, a new DataFrame will be returned with only the rows corresponding to where the mask had a `True` value.
+# 
+# Let's create a mask to represent all items with public level access:
+
+# In[22]:
+
+
+filter_value = 'public'
+filter_column = 'access'
+row_filter = content_df[filter_column]==filter_value
+row_filter.head()
+
+
+# Applying this mask to our DataFrame, we return all fields for objects which have `access=='public'`:
+
+# In[23]:
+
+
+print(len(content_df[row_filter]), 'objects in filtered DataFrame')
+content_df[row_filter].head()
+
+
+# We can apply both the column filter and Boolean mask at the same time to reduce the amount of information displayed:
+
+# In[24]:
+
+
+content_df[row_filter][view_columns].head()
+
+
+# Another example where we create a Boolean mask for all objects of type `"Web Map"`:
+
+# In[25]:
+
+
+filter_value = 'Web Map'
+filter_column = 'type'
+row_filter = content_df[filter_column]==filter_value
+content_df[row_filter][view_columns]
+
+
+# Boolean masks can also be combined to represent multiple filters. Here we combine the Web Map and Public masks to return all items in our organization which are public web maps:
+
+# In[26]:
+
+
+# Combining masks
+web_map_filter = content_df.type=='Web Map'
+public_filter = content_df.access=='public'
+combined_mask = web_map_filter & public_filter
+
+content_df[combined_mask][view_columns]
+
+
+# The [`apply()`](https://pandas.pydata.org/docs/reference/api/pandas.Series.apply.html) method can also be used to generate masks that can't be created using the standard comparison operators. As long as the function called within the apply method has a Boolean output, then the result can be used as a mask to filter rows. Here we use a [lambda](https://www.w3schools.com/python/python_lambda.asp) function to return all items which have a type that ends with the word "Service".
+
+# In[27]:
+
+
+# Creating masks with .apply and lambda functions
+
+service_filter = content_df.type.apply(lambda x: x.endswith('Service'))
+content_df[service_filter][view_columns]
+
+
+# ### Accessing Content by ID
+
+# Once we've identified an item of interest in our DataFrame, we can return the content of that item by providing its ID to the [ContentManager](https://pandas.pydata.org/docs/reference/api/pandas.Series.apply.html) `get()` method. If we know the index of the object in the DataFrame (i.e. the leftmost value), then we can access that row's information using the `loc()` method. From there we can get the id of the item and provide it to the get method.
+
+# In[28]:
+
+
+# Return the index of the last item in the previous output
+# In this example the index column is labelled 'name'
+
+target_index = content_df[service_filter].iloc[-1].name
+print("Target index:", target_index)
+
+
+# In[29]:
+
+
+# Accessing items with content.get()
+target_data = content_df.loc[target_index]
+print(target_data.id)
+target_content = gis.content.get(target_data.id)
+target_content
+
+
+# For more information on using item ids, see this [community post](https://community.esri.com/t5/arcgis-online-blog/where-can-i-find-the-item-id-for-an-arcgis-online/ba-p/890284).
+
+# ## Exporting Data
+
+# Pandas provides a convenient [`to_csv()`](https://pandas.pydata.org/docs/reference/api/pandas.DataFrame.to_csv.html) method which can be used to generate zipped and unzipped csv outputs. Simply provide your target path with the appropriate file extension and call the method on the DataFrame object you would like to export.
+
+# In[30]:
+
+
+# Exporting data to a csv
+target_path = "org_content.csv"
+content_df.to_csv(target_path)
+
+
+# In[31]:
+
+
+# Exporting data to gzipped csv file
+target_path_gzip = "org_content.csv.gz"
+content_df.to_csv(target_path_gzip)
+
+
+# In[32]:
+
+
+# Exporting data to zipped csv file
+target_path_zip = "org_content.csv.zip"
+content_df.to_csv(target_path_zip)
+
+
+# Pandas also provides additional methods for exporting the data as different file formats (e.g. [`to_json()`](https://pandas.pydata.org/docs/reference/api/pandas.DataFrame.to_json.html), [`to_pickle()`](https://pandas.pydata.org/docs/reference/api/pandas.DataFrame.to_pickle.html), [`to_excel()`](https://pandas.pydata.org/docs/reference/api/pandas.DataFrame.to_excel.html)) which behave similarly.
+
+
+# ====================
+# move_existing_user_content_to_a_new_user.py
+# ====================
+
+#!/usr/bin/env python
+# coding: utf-8
+
+# # Move existing user content to a new user
+# This sample illustrates how to "move" a portal user's account to a new user account.  This is accomplished by creating a new user account, assigning ownership/membership of this new user to all the applicable groups, and then reassigning the old user's content to the new user connect while maintaining folder structure under 'My Contents'.
+# 
+# For some customers, this is a useful utility when they have used one type of Identity store, e.g. Built-in Users, and then decided to switch to a different Identity provider, such as SAML or IWA.  In these situations, it is highly likely new userids will be created as new user accounts get created.  This Jupyter Notebook is an example of how to use the Python API to take a user's content and migrate it to a new userid while maintaining all group membership and content (including folders in My Content).
+
+# In[ ]:
+
+
+from arcgis.gis import *
+from IPython.display import display
+
+
+# Create a connection to the portal.  In this case, we will exercise the verify_cert option to not validate the SSL certificate (True by default).
+
+# In[ ]:
+
+
+gis = GIS(profile="your_online_profile", verify_cert=False) 
+
+
+# Establish variables for the current userid that is being transitioned and for the new userid to be created (e.g. a new Single Sign-on username).
+
+# In[ ]:
+
+
+orig_userid = "First_User"
+new_userid = "Second_User"
+
+
+# Validate that the original userid is valid and accessible.
+
+# In[ ]:
+
+
+olduser = gis.users.get(orig_userid)
+olduser
+
+
+# Create a new userid, making sure to use `provider='enterprise'` if Web Tier Authentication is going to be used.  If moving user accounts from one userid to another, make sure that a proper password is used that meets security requirements.
+
+# In[ ]:
+
+
+newuser = gis.users.create(username = new_userid,
+                            password = "pwdNotUsed",
+                            firstname = olduser.firstName,
+                            lastname = olduser.lastName,
+                            email = olduser.email,
+                            description = olduser.description,
+                            role = olduser.role,
+                            provider = 'enterprise',
+                            idp_username=None)   
+
+
+# Once the new user has been successfully created, reassign group ownership and group membership from the old user to the new user.
+
+# In[ ]:
+
+
+usergroups = olduser['groups']
+
+for group in usergroups:
+    grp = gis.groups.get(group['id'])
+    if (grp.owner == orig_userid):
+        grp.reassign_to(new_userid)
+    else:
+        grp.add_users(new_userid)
+        grp.remove_users(orig_userid)
+
+
+# Once group ownership/membership has been successfully changed, reassign all the original user's content to the new user.  This happens in 2 passes.  First, reassign everything on the root folder of 'My Contents'.  Then, loop over each folder, create the same folder in the new user account, and reassign items in each folder to the new user in the correct folder.
+
+# In[ ]:
+
+
+usercontent = olduser.items()
+
+folders = olduser.folders
+for item in usercontent:
+    try:
+        item.reassign_to(new_userid)
+    except Exception as e:
+        print("Item may have been already assigned to the user.")
+
+for folder in folders:
+    gis.content.create_folder(folder['title'], new_userid)
+    folderitems = olduser.items(folder=folder['title'])
+    for item in folderitems:
+        item.reassign_to(new_userid, target_folder=folder['title'])
+
+
+#   
+
+
+# ====================
+# validate_item_metadata.py
+# ====================
+
+#!/usr/bin/env python
+# coding: utf-8
+
+# <h1>Table of Contents<span class="tocSkip"></span></h1>
+# <div class="toc"><ul class="toc-item"><li><span><a href="#Import-the-necessary-libraries-and-connect-to-the-GIS" data-toc-modified-id="Import-the-necessary-libraries-and-connect-to-the-GIS-1"><span class="toc-item-num">1&nbsp;&nbsp;</span>Import the necessary libraries and connect to the GIS</a></span></li><li><span><a href="#Define-the-Organization's-valid-Metadata-Profile" data-toc-modified-id="Define-the-Organization's-valid-Metadata-Profile-2"><span class="toc-item-num">2&nbsp;&nbsp;</span>Define the Organization's valid Metadata Profile</a></span></li><li><span><a href="#Define-a-function-to-inspect-the-metadata-of-an-item" data-toc-modified-id="Define-a-function-to-inspect-the-metadata-of-an-item-3"><span class="toc-item-num">3&nbsp;&nbsp;</span>Define a function to inspect the metadata of an item</a></span></li><li><span><a href="#Create-a-Data-Structure-for-each-item's-metadata-status" data-toc-modified-id="Create-a-Data-Structure-for-each-item's-metadata-status-4"><span class="toc-item-num">4&nbsp;&nbsp;</span>Create a Data Structure for each item's metadata status</a></span></li><li><span><a href="#Create-a-Pandas-Dataframe-for-writing-out-to-a-csv-file" data-toc-modified-id="Create-a-Pandas-Dataframe-for-writing-out-to-a-csv-file-5"><span class="toc-item-num">5&nbsp;&nbsp;</span>Create a Pandas Dataframe for writing out to a csv file</a></span></li><li><span><a href="#Write-the-dataframe-to-a-csv-file-and-add-it-as-an-item" data-toc-modified-id="Write-the-dataframe-to-a-csv-file-and-add-it-as-an-item-6"><span class="toc-item-num">6&nbsp;&nbsp;</span>Write the dataframe to a <code>csv</code> file and add it as an item</a></span></li></ul></div>
+
+# # Content Management: Validate item metadata
+# 
+# * 👟 Ready To Run!
+# * 📦 Content Management
+# * 🗃️ Administration
+# 
+# __Requirements__
+# * 🔒 Administrator Privileges
+# 
+# Some organizations require specific background and descriptive information on data items before they'll consider it a valid data holding. This background and descriptive information is known as metadata. An item's metadata can record whatever information is important for the organization to know about that item. In addition to descriptive information, this might include information about how accurate and recent the item is, restrictions associated with using and sharing the item, and important processes in its life cycle. 
+# 
+# Each organization can define the metadata attributes necessary for the item to be considered valid. In addition, an organizaton may rely on specific [metadata standards and styles](http://enterprise.arcgis.com/en/portal/latest/use/metadata.htm#ESRI_SECTION2_9AB0CCA6A1C443C5A0AEA956D15C1E55) to help identify the information it needs to know about geospatial and relevant nonspatial resources and how to store and present that information. For more details and approaches for storing metatdata, see the [Enterprise Metadata documentation](http://enterprise.arcgis.com/en/portal/latest/use/metadata.htm). Note that while the item metadata is similar in concept to conventional metadata (information that describes and explains data), it follows certain standards and specifications in the form of _metadata properties_ to regard it as a valid ArcGIS item.
+# 
+# This notebook demonstrates one potential method to inspect items to ensure they contain certain default Item Description metadata properties an organization has deemed necessary. The notebook outputs a csv file with a value of False for each property an Item does not have, True for those it does, plus some additional item attributes.
+
+# ### Import the necessary libraries and connect to the GIS
+
+# In[1]:
+
+
+import os
+import datetime as dt
+
+import pandas as pd
+
+from arcgis.gis import GIS
+
+
+# In[2]:
+
+
+gis = GIS("home")
+
+
+# When you add an Item to your Organization, certain metadata properties are required, including an item `title` and `tags`. The item `type` is also required, and with that type a set of `typeKeywords` are automatically added to an item. No matter how you add items to the Organization, these metadata properties are present.
+# 
+# Let's specify an additional list of properties that our organization will require to describe items in our Organization. We'll create a list of strings to make sure items have a description, a thumbnail (other than the default), and a snippet.
+
+# ### Define the Organization's valid Metadata Profile
+
+# In[3]:
+
+
+item_profile = ['description', 'thumbnail', 'snippet']
+
+
+# Next, we'll define a function that loops through our item profile list, and inspects the value for each profile attribute for the items each user in our Organization owns. For each thumbnail, we'll check to see whether the default thumbnail has been changed. 
+# 
+# We'll then create a list of True/False values for each item:
+#  * True if it has the property or has added a thumbnail
+#  * False if the property is missing or the item uses the default thumbnail.
+#  
+# We'll then append the item id and url (if present) to this True/False list for later use to create an informative file.
+
+# ### Define a function to inspect the metadata of an item
+
+# In[4]:
+
+
+def get_missing_item_attrs(portal_item):
+    """Returns a list of True/False values for specific 
+    properties as well as the item id and url (if 
+    applicable for each item in the portal.
+    """
+    non_compliance = []
+    for attr in item_profile:
+        if attr == 'thumbnail':
+            if getattr(portal_item, attr) is not None:
+                if 'ago_downloaded' in getattr(portal_item, attr):
+                    non_compliance.append(False)
+                else:
+                    non_compliance.append(True)
+            else:
+                non_compliance.append(False)
+        else:
+            if getattr(portal_item, attr) == None:
+                non_compliance.append(False)
+            else:
+                non_compliance.append(True)
+    non_compliance.append(portal_item.id)
+    non_compliance.append(portal_item.url)
+    return non_compliance
+
+
+# ### Create a Data Structure for each item's metadata status
+
+# Now we'll use a Python `dictionary` to create a data structure so we can inspect each item. We'll create a list of users in the GIS.  While looping over the list of users, we'll examine each folder the user owns for items and call the function we defined above on each item to create a list of the status for each metadata attribute we're interested in.
+# 
+# We'll then use the list for each item to populate a dictionary. Each _key_ will be a unique name for each item (Since item titles in an Organization can be indentical, we'll use string indexing and concatenation to combine item attributes into a name that uniquely identifies each item). Each _value_ will be a list with the True/False attributes regarding the metadata plus the item id and url.  
+# 
+# In addition to this dictionary, the cell below prints information on each user, each folder the user owns, and number of items in each folder.
+
+# In[5]:
+
+
+item_profile_status = {}
+for user in gis.users.search():
+    print(f"{user.username.upper()}\n{'-'*50}")
+    print(f"\tRoot Folder: {user.username.lower()}\n\t{'='*25}")
+    if user.items():
+        print(f"\t\t- {len(user.items())} items")
+        for item in user.items():
+            missing_item_atts = get_missing_item_attrs(item)
+            item_profile_status[item.title[:50] + '_' +
+                str(int(item.created/1000))] = missing_item_atts
+    else:
+        print(f"\t\t- {len(user.items())} items")
+    if user.folders:
+          for folder in user.folders:
+            if user.items(folder=folder):
+                print(f"\t{folder['title']}\n\t{'='*25}")
+                print(f"\t\t- {len(user.items(folder=folder))} items")
+                for item in user.items(folder=folder):
+                    missing_item_atts = get_missing_item_attrs(item)
+                    item_profile_status[item.title[:50] + '_' +
+                        str(int(item.created/1000))] = missing_item_atts
+            else:
+                print(f"\t{folder['title'].capitalize()}\n\t{'='*25}")
+                print(f"\t\t-0 items")
+    print("\n")
+
+
+# 
+# ![image](https://github.com/ManushiM/Esri_Tutorials/assets/13968196/cbed3e1b-c4c0-4f21-aaac-d482ee33a67a)
+
+# ### Create a Pandas Dataframe for writing out to a csv file 
+
+# Let's first inspect the first five elements from the dictionary of data items:
+
+# In[6]:
+
+
+list(item_profile_status.items())[:5]
+
+
+# Now we'll create a list based upon our original item profile list. We'll add two members to the list corresponding to the item id and url values we recorded for each item.
+
+# In[7]:
+
+
+new_item_profile = item_profile + ['itemID', 'url']
+
+
+# In[8]:
+
+
+new_item_profile
+
+
+# Next, we'll create the dataframe, using the new list as the `index` for transposing the dataframe to one with each item as a row:
+
+# In[9]:
+
+
+pd.set_option('display.max_colwidth', 175) # for display of lengthy text values
+
+item_profile_df = pd.DataFrame(data=item_profile_status, 
+                               index=new_item_profile).T
+item_profile_df.head()
+
+
+# ### Write the dataframe to a `csv` file and add it as an item
+# 
+# We'll add a timestamp to the output file to ensure uniqueness when adding the csv item to the Organization.
+
+# In[10]:
+
+
+output_dir = "/arcgis/home/"
+out_file = "org_item_profile_status_" + \
+            str(int(dt.datetime.now().timestamp())) + \
+            ".csv"
+
+item_profile_df.to_csv(os.path.join(output_dir, out_file), 
+                       index_label='item_name')
+
+
+# In[11]:
+
+
+gis.content.add({}, output_dir + out_file)
+
+
+# You may download this item if you wish, and if you decide to delete this item after having used it, you may run the script below by updating the `item_id` with the id of this file in your organization.
+
+# In[ ]:
+
+
+item = gis.content.get(item_id)
+item.delete()
+
+
+# # Conclusion
+# 
+# This notebook checked attribute values for an organization's items against a pre-defined list of properties for item metadata, and based upon those values recorded the status of the metadata property. It combined these values with the `id` and `url` for any service backing the item (if applicable) and then wrote the results to a `csv` file that was added to the Organization. This file can then be analyzed to message item owners to update the metadata for items to comply with organizational requirements.
+
+
+# ====================
+# validate_user_profiles.py
+# ====================
+
+#!/usr/bin/env python
+# coding: utf-8
+
+# <h1>Table of Contents<span class="tocSkip"></span></h1>
+# <div class="toc"><ul class="toc-item"></ul></div>
+
+# # Administration: Validate user profiles
+# 
+# * 👟 Ready To Run!
+# * 🗃️ Administration
+# * 👤 User Management
+# 
+# __Requirements__
+# * 🔒 Administrator Privileges
+# 
+# Some organizations require member profiles to contain values beyond the minumum required attributes necessary to create a valid user in an ArcGIS Online Organization or ArcGIS Enterprise. For instance, in order to comply with policies and regulations, an organization may require a profile picture or a brief description. This notebook will check attribute values for users of the organization to monitor profiles.
+
+# To get started, let's import the necessary libraries and connect to our GIS.
+
+# In[1]:
+
+
+import os
+import datetime as dt
+
+import pandas as pd
+
+from arcgis.gis import GIS
+
+
+# In[2]:
+
+
+gis = GIS("home")
+
+
+# Then, let's create a list containing strings that represent all the values that your organization requires (beyond the required attributes for a valid user profile).
+# 
+# `access_type` refers to the `User.access` property of a user and it indicates the level of access of the user: private, org, or public.
+# 
+# While `access_type` may not be a requirement for your organization to validate a user profile, we have added it here to demonstrate how other useful properties can also be extracted for each user profile to learn more about them. 
+
+# In[3]:
+
+
+complete_profile = ['description', 'thumbnail', 'access', 'access_type']
+
+
+# We'll define a function that loops through the list we created and inspects a user object for the values of these attributes. We'll create a list of True/False values for each user regarding the necessary attributes.
+
+# In[4]:
+
+
+def get_missing_profile_attrs(member):
+    non_compliance = []
+    for attr in complete_profile:
+        if attr=='access_type':
+            non_compliance.append(member.access)
+        else:
+            if getattr(member, attr) == None:    
+                non_compliance.append(False)
+            else:
+                non_compliance.append(True)
+    return non_compliance
+
+
+# Now we can create a list of users in the GIS and loop through them, calling the function written above to inspect each user object. This will create a dictionary with usernames as the _key_ and the list of True/False status for the required attributes as _values_.
+
+# In[5]:
+
+
+user_profile_status = {}
+for user in gis.users.search("NOT esri_*"):
+    missing_profile_atts = get_missing_profile_attrs(user)
+    user_profile_status[user.username] = missing_profile_atts
+
+
+# The pandas library can be used to create a dataframe from the above dictionary.
+
+# In[6]:
+
+
+user_profile_df = pd.DataFrame(data=user_profile_status, index=complete_profile).T
+user_profile_df.head()
+
+
+# This dataframe can then be written to a _.csv._ file on your fileshare,
+
+# In[7]:
+
+
+output_dir = "/arcgis/home/"
+current = str(int(dt.datetime.now().timestamp()))
+out_file = "output_org_user_profile" + "_" + current + ".csv"
+
+user_profile_df.to_csv(os.path.join(output_dir, out_file), index_label='username')
+
+
+# and the dataframe can be written to a _.csv_ file item on your Organization.
+
+# In[8]:
+
+
+gis.content.add({}, output_dir + out_file)
+
+
+# You may download this item if you wish, and if you decide to delete this item after having used it, you may run the script below by updating the `item_id` with the id of this file in your organization.
+
+# In[ ]:
+
+
+item = gis.content.get(item_id)
+item.delete()
+
+
+# # Conclusion
+# 
+# This notebook checked attribute values for an organization's users and wrote the results to a _.csv_ file. This file can then be analyzed to validate that all user profiles contain the minimum required attributes as defined by any policies or regulations.
