@@ -36,8 +36,8 @@ def main(file_path, sheet_name, *columns):
         col_letter = get_column_letter(col_index)
         heading = sheet.cell(row=1, column=col_index).value
 
-        count_formula = f"=COUNTA({sheet.title}!{col_letter}:{col_letter})"
-        percentage_formula = f"={get_column_letter(2)}{summary_sheet.max_row}/{get_column_letter(3)}{summary_sheet.max_row}"
+        count_formula = f"=COUNTA({sheet.title}!{col_letter}:{col_letter})-1"
+        percentage_formula = f"={get_column_letter(2)}{summary_sheet.max_row+1}/{get_column_letter(3)}{summary_sheet.max_row+1}"
 
         summary_sheet.append([heading, count_formula, total_rows_formula, percentage_formula])
 
