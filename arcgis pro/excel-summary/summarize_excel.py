@@ -1,5 +1,6 @@
 import openpyxl
 import sys
+import os
 from openpyxl.utils import get_column_letter, column_index_from_string
 
 def identify_column(sheet, column_identifier):
@@ -54,6 +55,11 @@ def main(file_path, sheet_name, *columns):
         percentage_formula = f"={get_column_letter(2)}{summary_sheet.max_row+1}/{get_column_letter(3)}{summary_sheet.max_row+1}"
 
         summary_sheet.append([heading, count_formula, total_rows_formula, percentage_formula])
+
+        # Set the format of the percentage cell to display as a percentage
+        last_row = summary_sheet.max_row
+        percentage_cell = summary_sheet.cell(row=last_row, column=4)
+        percentage_cell.number_format = '0.00%'
 
     # Save the workbook
     wb.save(file_path)
