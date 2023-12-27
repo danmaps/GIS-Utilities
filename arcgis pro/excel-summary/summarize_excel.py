@@ -19,11 +19,25 @@ def identify_column(sheet, column_identifier):
         raise ValueError(f"Column heading '{column_identifier}' not found.")
 
 def main(file_path, sheet_name, *columns):
-    wb = openpyxl.load_workbook(file_path)
-    sheet = wb[sheet_name] if sheet_name in wb.sheetnames else wb.active
+    if not os.path.exists(file_path):
+        print(f"Error: File {file_path} does not exist.")
+        return
 
-    # Create summary sheet
-    summary_sheet = wb.create_sheet("Summary")
+    wb = openpyxl.load_workbook(file_path)
+    if sheet_name and sheet_name in wb.sheetnames:
+        sheet = wb[sheet_name]
+    else:
+        sheet = wb.active
+        if not sheet_name:
+            print(f"Warning: No sheet name specified. Using the first sheet '{sheet.title}' for summarization.")
+
+    # Check for existing Summary sheet and create a unique name
+    summary_sheet_title = "Summary"
+    count = 1
+    while summary_sheet_title in wb.sheetnames:
+        summary_sheet_title = f"Summary_{count}"
+        count += 1
+    summary_sheet = wb.create_sheet(summary_sheet_title)
 
     # Write headers to the summary sheet
     headers = ["Column Heading", "Count", "Total", "Percentage"]
