@@ -2,6 +2,8 @@ from arcgis.gis import GIS, Item
 import zipfile
 import xml.etree.ElementTree as ET
 import pandas as pd
+import getpass
+
 def parse_manifest(manifest_path):
     """
     Parses an ArcGIS Service Definition manifest.xml file to extract the Windows username.
@@ -41,9 +43,8 @@ def get_folder_creators(gis_connection, username):
             })
     return folder_data
 
-import getpass
 password = getpass.getpass("Enter your password: ")
 gis = GIS("https://sce2.maps.arcgis.com/", "SCE_RP_GIS", password)
 
-df = pd.DataFrame(results) 
+df = pd.DataFrame(get_folder_creators(gis,"SCE_RP_GIS"))
 df.to_excel("folder_summary.xlsx")
