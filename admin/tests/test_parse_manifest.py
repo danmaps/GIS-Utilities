@@ -14,10 +14,14 @@ def extract_manifest(sd_file_path, extract_to_folder):
     Returns:
         str: The path to the extracted manifest.xml file.
     """
-    with zipfile.ZipFile(sd_file_path, 'r') as zip_ref:
-        manifest_file = 'manifest.xml'  # Assuming the manifest file is always named like this
-        zip_ref.extract(manifest_file, path=extract_to_folder)
-        return os.path.join(extract_to_folder, manifest_file)
+    manifest_file = 'manifest.xml'  # Assuming the manifest file is always named like this
+    try:
+        with zipfile.ZipFile(sd_file_path, 'r') as zip_ref:
+            zip_ref.extract(manifest_file, path=extract_to_folder)
+    except:
+        import subprocess
+        subprocess.run(['7z', 'x', f'-o{extract_to_folder}', sd_file_path])
+    return os.path.join(extract_to_folder, manifest_file)
     
 def parse_manifest(manifest_path):
     """
@@ -37,11 +41,12 @@ def parse_manifest(manifest_path):
 
 
     return None
+
 def test_parse_manifest():
     """
     Test the parse_manifest function with a known .sd file.
     """
-    sd_file_path = 'C:\\Users\\mcveydb\\dev\\GIS-Utilities\\admin\\tests\\Transformer_clusters_over_1000_gallons_20240220_WFL1.sd'
+    sd_file_path = 'C:\\Users\\mcveydb\\dev\\GIS-Utilities\\admin\\tests\\test.sd'
     extract_to_folder = 'C:\\Users\\mcveydb\\dev\\GIS-Utilities\\admin\\tests\\extracted'
     manifest_path = extract_manifest(sd_file_path, extract_to_folder)
     
@@ -53,8 +58,6 @@ def test_parse_manifest():
     
     # Cleanup extracted file
     os.remove(manifest_path)
-
-# Remember to define the parse_manifest function as provided earlier or import it if it's defined in another module.
 
 # Run the test
 test_parse_manifest()
