@@ -3,7 +3,7 @@ from arcgis.gis import GIS
 import zipfile
 import xml.etree.ElementTree as ET
 import pandas as pd
-import os
+import os,shutil
 import subprocess
 
 def download_item(gis_connection, item_id, filename):
@@ -60,9 +60,11 @@ def get_folder_creators(gis_connection, user_name):
                 item = gis_connection.content.get(item.id)
                 # Construct the filename with full path
                 filename = os.path.join(r'C:\Users\mcveydb\AppData\Local\Temp\ArcGISProTemp10120\Untitled', f'{item.title}.sd')
+                filename = f'{item.title}.sd'
                 # Download the item
                 download_item(gis_connection, item.id, filename)
                 output_folder = r"C:\Users\mcveydb\AppData\Local\Temp\ArcGISProTemp10120\Untitled\extract"
+                output_folder = r"extract2"
 
                 startupinfo = subprocess.STARTUPINFO()
                 startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
@@ -98,6 +100,7 @@ def get_folder_creators(gis_connection, user_name):
                 })
                 # Cleanup downloaded and extracted files
                 os.remove(filename)
+                shutil.rmtree(output_folder)
                 if os.path.exists(manifest_path):
                     os.remove(manifest_path)
 
