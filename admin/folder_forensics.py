@@ -59,11 +59,9 @@ def get_folder_creators(gis_connection, user_name):
             if item.type == "Service Definition":
                 item = gis_connection.content.get(item.id)
                 # Construct the filename with full path
-                filename = os.path.join(r'C:\Users\mcveydb\AppData\Local\Temp\ArcGISProTemp10120\Untitled', f'{item.title}.sd')
                 filename = f'{item.title}.sd'
                 # Download the item
                 download_item(gis_connection, item.id, filename)
-                output_folder = r"C:\Users\mcveydb\AppData\Local\Temp\ArcGISProTemp10120\Untitled\extract"
                 output_folder = r"extract2"
 
                 startupinfo = subprocess.STARTUPINFO()
@@ -106,8 +104,7 @@ def get_folder_creators(gis_connection, user_name):
 
     return folder_data
 
-# Usage example
 gis = GIS("home")
 df = pd.DataFrame(get_folder_creators(gis, "SCE_RP_GIS"))
 print(df.shape)
-df.to_excel("SCE_RP_GIS_folder_test_silent.xlsx")
+df.to_excel("SCE_RP_GIS_folder_summary.xlsx")
