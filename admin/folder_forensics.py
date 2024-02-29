@@ -81,11 +81,16 @@ def get_folder_creators(gis_connection, user_name):
                     if parsed_username is None:
                         print(f"Manifest file missing or unable to extract username for item: {item.title}")
                         continue
+                    
+                    # Convert the item's modified date from Unix time to a readable format
+                    date_created = datetime.datetime.fromtimestamp(item.created / 1000).strftime('%Y-%m-%d %H:%M:%S')
 
                     folder_data.append({
                         'folder': folder['title'],
                         'item': item.title,
-                        'parsed_username': parsed_username
+                        'parsed_username': parsed_username,
+                        'date_created': date_created  # Add the modified date to the dictionary
+
                     })
                     # Cleanup downloaded and extracted files
                     os.remove(filename)
