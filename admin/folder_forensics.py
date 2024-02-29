@@ -50,52 +50,56 @@ def get_folder_creators(gis_connection, user_name):
     folder_data = []  # Store folder information
     
     for folder in folders:
-        # Check if the folder title is "Red List"
-        if folder['title'] == "Red List":
-            print(f"Processing folder: {folder['title']}")
-            folder_items = user.items(folder=folder['id'])
-            
-            for item in folder_items:
-                if item.type == "Service Definition":
-                    item = gis_connection.content.get(item.id)
-                    # Construct the filename with full path
-                    filename = os.path.join(r'C:\Users\mcveydb\AppData\Local\Temp\ArcGISProTemp10120\Untitled', f'{item.title}.sd')
-                    # Download the item
-                    download_item(gis_connection, item.id, filename)
-                    output_folder = r"C:\Users\mcveydb\AppData\Local\Temp\ArcGISProTemp10120\Untitled\extract"
-                    
-                    try:
-                        subprocess.run([
-                            r"C:\Program Files\7-Zip\7z.exe", 
-                            'x', 
-                            f'-o{output_folder}', 
-                            '-aoa',  # Overwrite all existing files without prompt
-                            filename
-                        ], check=True)
-                        print(f"Extraction successful: {filename}")
-                    except subprocess.CalledProcessError as e:
-                        print(f"Error extracting {filename}: {e}")
+#         # Check if the folder title is "Red List"
+#         if folder['title'] == "Red List":
+        print(f"Processing folder: {folder['title']}")
+        folder_items = user.items(folder=folder['id'])
 
-                    manifest_path = os.path.join(output_folder, 'manifest.xml')
-                    parsed_username = parse_manifest(manifest_path)
-                    if parsed_username is None:
-                        print(f"Manifest file missing or unable to extract username for item: {item.title}")
-                        continue
-                    
-                    # Convert the item's modified date from Unix time to a readable format
-                    date_created = datetime.datetime.fromtimestamp(item.created / 1000).strftime('%Y-%m-%d %H:%M:%S')
+        for item in folder_items:
+            if item.type == "Service Definition":
+                item = gis_connection.content.get(item.id)
+                # Construct the filename with full path
+                filename = os.path.join(r'C:\Users\mcveydb\AppData\Local\Temp\ArcGISProTemp10120\Untitled', f'{item.title}.sd')
+                # Download the item
+                download_item(gis_connection, item.id, filename)
+                output_folder = r"C:\Users\mcveydb\AppData\Local\Temp\ArcGISProTemp10120\Untitled\extract"
 
-                    folder_data.append({
-                        'folder': folder['title'],
-                        'item': item.title,
-                        'parsed_username': parsed_username,
-                        'date_created': date_created  # Add the modified date to the dictionary
+                startupinfo = subprocess.STARTUPINFO()
+                startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
+                startupinfo.wShowWindow = subprocess.SW_HIDE  # This prevents the command window from being shown
 
-                    })
-                    # Cleanup downloaded and extracted files
-                    os.remove(filename)
-                    if os.path.exists(manifest_path):
-                        os.remove(manifest_path)
+                try:
+                    subprocess.run([
+                        r"C:\Program Files\7-Zip\7z.exe", 
+                        'x', 
+                        f'-o{output_folder}', 
+                        '-aoa',  # Overwrite all existing files without prompt
+                        filename
+                    ], startupinfo=startupinfo, check=True)
+                    print(f"Extraction successful: {filename}")
+                except subprocess.CalledProcessError as e:
+                    print(f"Error extracting {filename}: {e}")
+
+                manifest_path = os.path.join(output_folder, 'manifest.xml')
+                parsed_username = parse_manifest(manifest_path)
+                if parsed_username is None:
+                    print(f"Manifest file missing or unable to extract username for item: {item.title}")
+                    continue
+
+                # Convert the item's modified date from Unix time to a readable format
+                date_created = datetime.datetime.fromtimestamp(item.created / 1000).strftime('%Y-%m-%d %H:%M:%S')
+
+                folder_data.append({
+                    'folder': folder['title'],
+                    'item': item.title,
+                    'parsed_username': parsed_username,
+                    'date_created': date_created  # Add the modified date to the dictionary
+
+                })
+                # Cleanup downloaded and extracted files
+                os.remove(filename)
+                if os.path.exists(manifest_path):
+                    os.remove(manifest_path)
 
     return folder_data
 
@@ -103,4 +107,4 @@ def get_folder_creators(gis_connection, user_name):
 gis = GIS("home")
 df = pd.DataFrame(get_folder_creators(gis, "SCE_RP_GIS"))
 print(df.shape)
-df.to_excel("SCE_RP_GIS_folder_summary.xlsx")
+df.to_excel("SCE_RP_GIS_folder_test_silent.xlsx")
