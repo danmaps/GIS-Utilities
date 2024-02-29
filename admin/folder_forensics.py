@@ -1,9 +1,8 @@
 import requests
 from arcgis.gis import GIS
-import zipfile
 import xml.etree.ElementTree as ET
 import pandas as pd
-import os,shutil
+import os,shutil,arcpy
 import subprocess
 
 def download_item(gis_connection, item_id, filename):
