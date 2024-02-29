@@ -1,12 +1,31 @@
+import requests
 from arcgis.gis import GIS
-gis = GIS("home")
-
 import zipfile
 import xml.etree.ElementTree as ET
 import pandas as pd
-import getpass
 import os
 import subprocess
+
+def download_item(gis_connection, item_id, filename):
+    """
+    Downloads an item from ArcGIS Online or Enterprise given an item ID and saves it to the specified filename.
+    """
+    # Obtain the token from arcpy.GetSigninToken function
+    token = arcpy.GetSigninToken()['token']
+
+    # Construct the item data URL
+    item_data_url = f"{gis_connection._url}/sharing/rest/content/items/{item_id}/data?token={token}"
+
+    # Trigger the download
+    response = requests.get(item_data_url, allow_redirects=True, verify=False)
+    
+    if response.status_code == 200:
+        # Save the content to a file
+        with open(filename, 'wb') as file:
+            file.write(response.content)
+        print("File downloaded successfully.")
+    else:
+        print(f"Failed to download file: {response.status_code}, URL: {item_data_url}")
 
 def parse_manifest(manifest_path):
     """
@@ -38,38 +57,45 @@ def get_folder_creators(gis_connection, user_name):
             
             for item in folder_items:
                 if item.type == "Service Definition":
-                    # Use the download method to save the file
-                    filename = item.download(save_path=r'C:\Users\mcveydb\AppData\Local\Temp\ArcGISProTemp3044\Untitled', file_name=item.title + '.sd')
-                    output_folder = r"C:\Users\mcveydb\AppData\Local\Temp\ArcGISProTemp3044\Untitled\extract"
-                    archive_path = filename
-                    print(archive_path)
+                    item = gis_connection.content.get(item.id)
+                    # Construct the filename with full path
+                    filename = os.path.join(r'C:\Users\mcveydb\AppData\Local\Temp\ArcGISProTemp10120\Untitled', f'{item.title}.sd')
+                    # Download the item
+                    download_item(gis_connection, item.id, filename)
+                    output_folder = r"C:\Users\mcveydb\AppData\Local\Temp\ArcGISProTemp10120\Untitled\extract"
+                    
                     try:
-                        subprocess.run([r"C:\Program Files\7-Zip\7z.exe", 'x', f'-o{output_folder}', archive_path], check=True)
-                        print(f"Extraction successful: {archive_path}")
+                        subprocess.run([
+                            r"C:\Program Files\7-Zip\7z.exe", 
+                            'x', 
+                            f'-o{output_folder}', 
+                            '-aoa',  # Overwrite all existing files without prompt
+                            filename
+                        ], check=True)
+                        print(f"Extraction successful: {filename}")
                     except subprocess.CalledProcessError as e:
-                        print(f"Error extracting {archive_path}: {e}")
+                        print(f"Error extracting {filename}: {e}")
 
-                    manifest_path = 'manifest.xml'
+                    manifest_path = os.path.join(output_folder, 'manifest.xml')
                     parsed_username = parse_manifest(manifest_path)
                     if parsed_username is None:
                         print(f"Manifest file missing or unable to extract username for item: {item.title}")
-                        continue  # Skip to the next item
+                        continue
 
                     folder_data.append({
                         'folder': folder['title'],
                         'item': item.title,
                         'parsed_username': parsed_username
                     })
-                    # Clean up downloaded and extracted files
+                    # Cleanup downloaded and extracted files
                     os.remove(filename)
                     if os.path.exists(manifest_path):
                         os.remove(manifest_path)
+
     return folder_data
 
-
-# password = getpass.getpass("Enter your password: ")
-# gis = GIS("https://your-organization-url.arcgis.com/", "your_username", password)
-
+# Usage example
+gis = GIS("home")
 df = pd.DataFrame(get_folder_creators(gis, "SCE_RP_GIS"))
 print(df.shape)
-df.to_excel("folder_summary.xlsx")
+df.to_excel("SCE_RP_GIS_folder_summary.xlsx")
