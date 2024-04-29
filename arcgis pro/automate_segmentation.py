@@ -1,7 +1,6 @@
 import arcpy
 import re
 from arcgis.gis import GIS
-from arcgis.features import FeatureLayer
 
 # Log into ArcGIS Online
 gis = GIS("Pro")
@@ -146,11 +145,12 @@ def schema_conform(source_fc, reference_fc):
 
         arcpy.DeleteField_management(source_fc, fields_to_remove)
         # arcpy.AddMessage(f"Removed fields from {source_fc}: {fields_to_remove}") # debug
-        # source_fields = {f.name for f in arcpy.ListFields(source_fc) if f.name not in protected_fields}
+        # source_fields = {f.name for f in arcpy.ListFields(source_fc) if f.name not in protected_fields} # debug
         # arcpy.AddMessage(f"{source_fc}:{len(source_fields)} fields") # debug
         # arcpy.AddMessage(f"{os.path.basename(reference_fc)}:{len(reference_fields)} fields") # debug
     else:
-        arcpy.AddMessage(f"No fields to remove. {source_fc} schema already conforms to {reference_fc}.")
+        # arcpy.AddMessage(f"No fields to remove. {source_fc} schema already conforms to {reference_fc}.")
+        pass
 
 
 def script_tool(param0, param1):
