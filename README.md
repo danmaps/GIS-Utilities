@@ -1,3 +1,3 @@
 # GIS-Utilities
 
-Ask Danny McVey about these tools.
+Questions? Ask Danny McVey about these tools.
