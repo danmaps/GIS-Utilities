@@ -8,7 +8,8 @@ def show_size(service_item):
     size_mb = size_kb / 1024
     size_gb = size_mb / 1024
 
-    print(f"Service '{service_item.title}' size: {size_bytes} bytes")
+    print(f"title {service_item.title}; size: {size_bytes} bytes")
+    print(f"snippet {service_item.snippet}")
     print(f"{size_kb:.2f} KB, {size_mb:.2f} MB, {size_gb:.2f} GB")
     print(service_item.content_status)
     display(service_item)
