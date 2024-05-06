@@ -8,17 +8,6 @@ import arcpy
 
 gis = GIS('pro')
 
-def main():
-    arcpy.AddMessage(f"{gis.properties['user']['username']}@{arcpy.GetActivePortalURL()}")
-    services = arcpy.GetParameter(0)
-
-    arcpy.AddMessage('Webmaps')
-    maps = web_map_search(services)
-    arcpy.AddMessage('Webapps')
-    map_apps(maps)
-    arcpy.AddMessage('Groups')
-    group_search(services)
-
 
 def web_map_search(services):
     # arcpy.AddMessage(f"Searching for {services}")
@@ -56,25 +45,23 @@ def map_apps(web_maps):
             arcpy.AddMessage(f"{app.title}, {app.owner}, {app.homepage}")
 
 
+def search_widgets(widgets, app, service):
+  for widget in widgets:
+    if 'uri' in widget.keys() and widget['uri'] == 'widgets/Search/Widget':
+      for source in widget['config']['sources']:
+        if service.lower() in source['url'].lower() and 'searchFields' in source.keys():
+          arcpy.AddMessage(f"{app.title} | {source['url']}")
+
 def app_search(services): 
   web_apps = gis.content.search(query = '', item_type='Web Mapping Application', max_items=10000)
-  if web_apps == []:
-     arcpy.AddMessage("No apps found!")
-     return
+  if not web_apps:
+    arcpy.AddMessage("No apps found!")
+    return
   for app in web_apps:
     for service in services:
       try:
-        for widget in app.get_data()['widgetOnScreen']['widgets']:
-          if 'uri' in widget.keys() and widget['uri'] == 'widgets/Search/Widget':
-            for source in widget['config']['sources']:
-              if service.lower() in source['url'].lower() and 'searchFields' in source.keys():
-                arcpy.AddMessage(f"{app.title} | {source['url']}")
-          
-        for widget in app.get_data()['widgetPool']['widgets']:
-          if 'uri' in widget.keys() and widget['uri'] == 'widgets/Search/Widget':
-            for source in widget['config']['sources']:
-              if service.lower() in source['url'].lower() and 'searchFields' in source.keys():
-                arcpy.AddMessage(f"{app.title} | {source['url']}")
+        search_widgets(app.get_data()['widgetOnScreen']['widgets'], app, service)
+        search_widgets(app.get_data()['widgetPool']['widgets'], app, service)
       except:
         continue
 
@@ -87,6 +74,17 @@ def group_search(services):
             for web_map in group.content():
                 if web_map.type == "Feature Service" and web_map.url.lower() == service.lower():
                     arcpy.AddMessage(f"{group.title}, {group.owner}, {group.homepage}")
+
+def main():
+    arcpy.AddMessage(f"{gis.properties['user']['username']}@{arcpy.GetActivePortalURL()}")
+    services = arcpy.GetParameter(0)
+
+    arcpy.AddMessage('Webmaps')
+    maps = web_map_search(services)
+    arcpy.AddMessage('Webapps')
+    map_apps(maps)
+    arcpy.AddMessage('Groups')
+    group_search(services)
 
 if __name__ == '__main__':
     main()
