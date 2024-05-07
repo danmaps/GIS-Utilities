@@ -1,5 +1,12 @@
 import unittest
 from unittest.mock import mock_open, patch
+import sys
+import os
+
+# Add the parent directory to the system path
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+# Now you can import your module
 from comparegdbschema_utils import compare_csv
 
 class TestCompareCSV(unittest.TestCase):
@@ -51,3 +58,8 @@ class TestCompareCSV(unittest.TestCase):
 
         # Check the result
         self.assertEqual(result, expected_differences)
+
+
+# This allows the tests to be run when the file is executed directly
+if __name__ == '__main__':
+    unittest.main()
