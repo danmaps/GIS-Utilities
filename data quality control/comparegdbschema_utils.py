@@ -42,6 +42,8 @@ def compare_csv(gdb1_name, gdb2_name, file1_path, file2_path, detailed_report):
     # Create schema_row instances for each row in the CSV content
     rows1 = [schema_row(row) for row in content1]
     rows2 = [schema_row(row) for row in content2]
+    arcpy.AddMessage("len(rows1): " + str(len(rows1)))
+    arcpy.AddMessage("len(rows2): " + str(len(rows2)))
 
     # Find differences by comparing rows directly O(n^2)
     # todo: improve this with set subtraction for O(n) performance
