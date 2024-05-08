@@ -5,9 +5,7 @@ import tempfile
 import shutil
 from datetime import datetime
 
-from comparegdbschema_utils import read_csv, compare_csv
-from comparegdbschema_utils import generate_schema_report
-
+from comparegdbschema_utils import generate_schema_report, compare_csv
 
 
 class Toolbox:
