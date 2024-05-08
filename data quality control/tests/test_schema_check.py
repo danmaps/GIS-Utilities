@@ -59,7 +59,7 @@ class TestCompareCSV(unittest.TestCase):
         # Check the result
         self.assertEqual(result, expected_differences)
 
-# test for case with modified field alias
+    # test for case with modified field alias
     @patch('builtins.open', new_callable=mock_open)
     def test_compare_csv_modified_field_alias(self, mock_file):
         # Prepare test data
@@ -96,6 +96,25 @@ class TestCompareCSV(unittest.TestCase):
 
         # Check the result
         self.assertEqual(result, expected_differences)
+
+    # test with actual csv files
+    def test_compare_csv_actual(self):
+        # Prepare csv paths
+        csv1 = os.path.join(os.path.dirname(__file__),  'gdb1.csv')
+        csv2 = os.path.join(os.path.dirname(__file__),  'gdb2.csv')
+
+        # Expected differences
+        expected_differences = [
+            "Row unique to csv1: ['XXX_Camera_2024_QX', 'WGS_1984_California_Teale_Albers_FtUS', 'CameraLocationName', 'Camera Location Name', 'String', '30']",
+            "Row unique to csv2: ['XXX_Camera_2024_QX', 'WGS_1984_California_Teale_Albers_FtUS', 'CameraLocationName', 'MODIFIED FOR TESTING', 'String', '30']"
+        ]
+
+        # Call the function and get the result
+        result = compare_csv("csv1", "csv2", csv1, csv2, False)
+
+        # Check the result
+        self.assertEqual(result, expected_differences)
+
 
 # This allows the tests to be run when the file is executed directly
 if __name__ == '__main__':

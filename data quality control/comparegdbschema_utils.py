@@ -64,7 +64,7 @@ def compare_csv(gdb1_name, gdb2_name, file1_path, file2_path, detailed_report):
         if not found_match:
             differences.append(f"Row unique to {gdb2_name}: {row2}")
 
-    return differences    
+    return differences
 
 
 class schema_row(list):
