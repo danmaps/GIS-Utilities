@@ -144,7 +144,15 @@ class SchemaComparisonTool(object):
 
             generate_schema_report(temp_gdb1, output_csv1, detailed_report)
             generate_schema_report(temp_gdb2, output_csv2, detailed_report)
-            compare_csv(gdb1_name, gdb2_name, output_csv1, output_csv2, detailed_report)
+            diffs = compare_csv(gdb1_name, gdb2_name, output_csv1, output_csv2, detailed_report)
+
+            if diffs:
+                arcpy.AddError("Differences found")
+                for diff in diffs:
+                    arcpy.AddMessage(diff)
+            else:
+                arcpy.AddMessage("No differences found.")
+
         except Exception as e:
             arcpy.AddError(str(e))
             raise e
