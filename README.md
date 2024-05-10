@@ -1,5 +1,3 @@
-# GIS-Utilities
-
 **IMPORTANT: DO NOT MODIFY FILES IN THIS FOLDER DIRECTLY**
 
 This shared folder is under version control, and the files within are actively managed and updated from our central code repository hosted on GitHub.
