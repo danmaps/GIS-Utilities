@@ -161,3 +161,4 @@ cython_debug/
 data simulator/installing.md
 data quality control/ModelBuilder/*
 *pyt.xml
+.vscode/settings.json
