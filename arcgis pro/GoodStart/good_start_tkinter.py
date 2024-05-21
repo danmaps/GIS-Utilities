@@ -4,21 +4,14 @@ from tkinter import messagebox
 from projCreator_utils import create_project
 import time
 
-def submit_form(event=None):  # Added event parameter to handle key press event
+def submit_form(event=None):
     excel_path = excel_path_entry.get()
     sheet_name = sheet_name_entry.get()
     project_name = project_name_entry.get()
 
-    status_label.config(text="Creating project...")
-    root.update()
-
     try:
-        for i in range(1, 101):
-            time.sleep(0.01)  # Simulate work being done
-            progress['value'] = i
-            root.update_idletasks()
-        create_project(excel_path, sheet_name, project_name)
-        messagebox.showinfo("Success", f"Project '{project_name}' created successfully.")
+        create_project(excel_path, sheet_name, project_name, progress, status_label, root)
+        # messagebox.showinfo("Success", f"Project '{project_name}' created successfully.")
         root.destroy()  # Close the application
     except Exception as e:
         messagebox.showerror("Error", str(e))
