@@ -1,0 +1,1 @@
+"C:/Program Files/ArcGIS/Pro/bin/Python/envs/arcgispro-py3/pythonw.exe" "c:/Users/mcveydb/dev/GIS-Utilities/arcgis pro/GoodStart/good_start_tkinter.py"

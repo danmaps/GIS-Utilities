@@ -35,7 +35,12 @@ def create_project(excel_path, sheet_name, project_name, progress, status_label,
 
         # Load the Excel file into a DataFrame
         df = pd.read_excel(excel_path, sheet_name=sheet_name if sheet_name else 0)
-        csv_output_path = os.path.join(data_folder, "data.csv")
+        if sheet_name:
+            csv_name = f"{os.path.splitext(os.path.basename(excel_path))[0]}_{sheet_name}.csv"
+        else:
+            csv_name = f"{os.path.splitext(os.path.basename(excel_path))[0]}.csv"
+
+        csv_output_path = os.path.join(data_folder, csv_name)
         df.to_csv(csv_output_path, index=False)
 
         # Create a new project from the template
