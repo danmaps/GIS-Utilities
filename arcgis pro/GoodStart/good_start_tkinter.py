@@ -15,6 +15,7 @@ def submit_form(event=None):
     sheet_name = sheet_name_entry.get()
     project_name = project_name_entry.get()
     selected_folder = folder_var.get()
+    sarcastic_mode = sarcastic_var.get()
 
     try:
         # Define the base path based on the selected folder
@@ -26,11 +27,10 @@ def submit_form(event=None):
         
         # Create the project
         if excel_path:
-            create_project(project_path, excel_path, sheet_name, project_name, progress, status_label, root)
+            create_project(project_path, excel_path, sheet_name, project_name, root, sarcastic_mode)
         else:
-            create_project(project_path, None, None, project_name, progress, status_label, root)
+            create_project(project_path, None, None, project_name, root, sarcastic_mode)
         
-        messagebox.showinfo("Success", "Project created successfully.")
         root.destroy()
     except FileNotFoundError:
         error_message = "Excel spreadsheet not found. Please check the path and try again."
@@ -41,16 +41,15 @@ def submit_form(event=None):
         logging.error(error_message)
         messagebox.showerror("Error", error_message)
 
-def toggle_excel_options():
-    if excel_options_frame.winfo_viewable():
-        excel_options_frame.pack_forget()
-    else:
-        excel_options_frame.pack(anchor='w', padx=20, pady=10)
-
 # Main GUI setup
 root = tk.Tk()
 root.geometry('800x400')
 root.configure(bg='black')
+root.title("ArcGIS Pro Project Creator")
+
+# Set the custom icon (ensure you have the icon file in the correct path)
+icon_path = 'newproj.ico'  # Replace this with the path to your icon file
+root.iconbitmap(icon_path)
 
 # Main Form Frame
 form_frame = tk.Frame(root, bg='black')
@@ -68,19 +67,15 @@ project_name_entry.grid(row=0, column=1, sticky='w')
 folder_frame = tk.Frame(form_frame, bg='black')
 folder_frame.pack(anchor='w', padx=20, pady=10)
 
+tk.Label(folder_frame, text="P:\\PROJECTS\\", bg='black', fg='white').pack(side='left')
+
 folder_var = tk.StringVar(value="2024Proj")
 folder_dropdown = ttk.Combobox(folder_frame, textvariable=folder_var, values=["2024Proj", "MPO_Projects", "Special_Projects"])
 folder_dropdown.pack(side='left', padx=5)
 
-tk.Label(folder_frame, text="P:\\PROJECTS\\", bg='black', fg='white').pack(side='left')
-
-# Excel Options Button and Frame
-excel_options_button = tk.Button(form_frame, text="Show/Hide Excel Options", command=toggle_excel_options, bg='grey', fg='white')
-excel_options_button.pack(anchor='w', padx=20, pady=10)
-
+# Excel Options Frame
 excel_options_frame = tk.Frame(form_frame, bg='black')
 excel_options_frame.pack(anchor='w', padx=20, pady=10)
-excel_options_frame.pack_forget()
 
 tk.Label(excel_options_frame, text="Excel Spreadsheet Path (optional):", bg='black', fg='white').grid(row=0, column=0, sticky='w')
 excel_path_entry = tk.Entry(excel_options_frame, bg='grey', fg='white')
@@ -90,6 +85,15 @@ tk.Label(excel_options_frame, text="Sheet Name (optional):", bg='black', fg='whi
 sheet_name_entry = tk.Entry(excel_options_frame, bg='grey', fg='white')
 sheet_name_entry.grid(row=1, column=1, sticky='w')
 
+# Sarcastic Mode Frame
+sarcastic_frame = tk.Frame(root, bg='black', width=1, height=1)
+sarcastic_frame.pack(side='bottom', anchor='e', padx=1, pady=1)
+
+# Sarcastic Mode Checkbox
+sarcastic_var = tk.BooleanVar()
+sarcastic_checkbox = tk.Checkbutton(sarcastic_frame, text="Enable Snarky Comments", variable=sarcastic_var, bg='black', fg='white', selectcolor='grey')
+sarcastic_checkbox.pack(side='right')
+
 # Submit Button
 submit_button = tk.Button(form_frame, text="Create Project", command=submit_form, bg='grey', fg='white')
 submit_button.pack(anchor='w', padx=20, pady=10)
@@ -97,18 +101,6 @@ submit_button.pack(anchor='w', padx=20, pady=10)
 # Status Label
 status_label = tk.Label(form_frame, text="", bg='black', fg='white')
 status_label.pack(anchor='w', padx=20, pady=10)
-
-# Progress Bar Style
-style = ttk.Style()
-style.configure("TProgressbar",
-                troughcolor='black',
-                background='grey',
-                troughrelief='flat',
-                bordercolor='black')
-
-# Progress Bar
-progress = ttk.Progressbar(form_frame, orient="horizontal", length=200, mode="determinate", style="TProgressbar")
-progress.pack(anchor='w', padx=20, pady=10)
 
 # Information Frame
 info_frame = tk.Frame(root, bg='black')
