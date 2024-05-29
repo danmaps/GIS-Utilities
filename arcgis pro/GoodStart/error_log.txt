@@ -1,0 +1,2 @@
+2024-05-29 11:46:50,291:ERROR:An unexpected error occurred: [WinError 32] The process cannot access the file because it is being used by another process: 'C:\\Users\\mcveydb\\AppData\\Local\\Temp\\tmp3ncwwakg\\test123\\2024_test123\\Working\\test123.gdb\\_gdb.D266027.4860.27244.sr.lock'
+2024-05-29 11:47:33,324:ERROR:An unexpected error occurred: [WinError 32] The process cannot access the file because it is being used by another process: 'C:\\Users\\mcveydb\\AppData\\Local\\Temp\\tmpoorz45r4\\test1232\\2024_test1232\\Working\\test1232.gdb\\_gdb.D266027.4860.27244.sr.lock'

@@ -11,6 +11,7 @@ def validate_project_name(project_name):
 
 
 def create_folder_structure(base_path, template_path, project_name):
+    print(project_name)
     project_folder = os.path.join(base_path, f"2024_{project_name}")
     shutil.copytree(template_path, project_folder, dirs_exist_ok=True)
     return project_folder
@@ -63,13 +64,12 @@ def update_status(status_label, progress, root, status_text, progress_value):
     root.update_idletasks()
 
 
-def create_project(excel_path, sheet_name, project_name, progress, status_label, root):
+def create_project(base_project_path, excel_path, sheet_name, project_name, progress, status_label, root):
     try:
         project_name = validate_project_name(project_name)
 
         excel_path = excel_path.replace('"', '') if excel_path else excel_path
 
-        base_project_path = r"P:\PROJECTS\2024Proj"
         template_path = r"P:\PROJECTS\PROJECT_FOLDER_STRUCTURE"
 
         project_folder = create_folder_structure(base_project_path, template_path, project_name)
