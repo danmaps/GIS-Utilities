@@ -12,7 +12,10 @@ def validate_project_name(project_name):
 
 def create_folder_structure(base_path, template_path, project_name):
     print(project_name)
-    project_folder = os.path.join(base_path, f"2024_{project_name}")
+    if base_path.endswith("2024Proj"):
+        project_folder = os.path.join(base_path, f"2024_{project_name}")
+    else:
+        project_folder = os.path.join(base_path, project_name)
     shutil.copytree(template_path, project_folder, dirs_exist_ok=True)
     return project_folder
 

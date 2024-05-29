@@ -14,25 +14,24 @@ def submit_form(event=None):
     excel_path = excel_path_entry.get()
     sheet_name = sheet_name_entry.get()
     project_name = project_name_entry.get()
-    is_testing = testing_var.get()
+    selected_folder = folder_var.get()
 
     try:
-        if is_testing:
-            # Create a temporary directory for testing
-            with tempfile.TemporaryDirectory() as temp_dir:
-                temp_project_path = os.path.join(temp_dir, project_name)
-                os.makedirs(temp_project_path, exist_ok=True)
-                messagebox.showinfo("Testing", f"Testing mode is ON. Project created in temporary directory: {temp_project_path}")
-                # You can call create_project with the temp_project_path or simulate the behavior as needed for testing
-                create_project(temp_project_path, excel_path, sheet_name, project_name, progress, status_label, root)
+        # Define the base path based on the selected folder
+        base_path = r"P:\PROJECTS"
+        if selected_folder == "2024Proj":
+            project_path = os.path.join(base_path, "2024Proj", "2024_" + project_name)
         else:
-            project_path = r"P:\PROJECTS\2024Proj"
-            if excel_path:
-                create_project(project_path, excel_path, sheet_name, project_name, progress, status_label, root)
-            else:
-                create_project(project_path, None, None, project_name, progress, status_label, root)
-            messagebox.showinfo("Success", "Project created successfully.")
-            root.destroy()
+            project_path = os.path.join(base_path, selected_folder, project_name)
+        
+        # Create the project
+        if excel_path:
+            create_project(project_path, excel_path, sheet_name, project_name, progress, status_label, root)
+        else:
+            create_project(project_path, None, None, project_name, progress, status_label, root)
+        
+        messagebox.showinfo("Success", "Project created successfully.")
+        root.destroy()
     except FileNotFoundError:
         error_message = "Excel spreadsheet not found. Please check the path and try again."
         logging.error(error_message)
@@ -46,7 +45,7 @@ def toggle_excel_options():
     if excel_options_frame.winfo_viewable():
         excel_options_frame.pack_forget()
     else:
-        excel_options_frame.pack(after=excel_options_button)
+        excel_options_frame.pack(anchor='w', padx=20, pady=10)
 
 # Main GUI setup
 root = tk.Tk()
@@ -65,6 +64,16 @@ tk.Label(project_name_frame, text="Project Name:", bg='black', fg='white').grid(
 project_name_entry = tk.Entry(project_name_frame, bg='grey', fg='white')
 project_name_entry.grid(row=0, column=1, sticky='w')
 
+# Folder Selection Frame
+folder_frame = tk.Frame(form_frame, bg='black')
+folder_frame.pack(anchor='w', padx=20, pady=10)
+
+folder_var = tk.StringVar(value="2024Proj")
+folder_dropdown = ttk.Combobox(folder_frame, textvariable=folder_var, values=["2024Proj", "MPO_Projects", "Special_Projects"])
+folder_dropdown.pack(side='left', padx=5)
+
+tk.Label(folder_frame, text="P:\\PROJECTS\\", bg='black', fg='white').pack(side='left')
+
 # Excel Options Button and Frame
 excel_options_button = tk.Button(form_frame, text="Show/Hide Excel Options", command=toggle_excel_options, bg='grey', fg='white')
 excel_options_button.pack(anchor='w', padx=20, pady=10)
@@ -80,11 +89,6 @@ excel_path_entry.grid(row=0, column=1, sticky='w')
 tk.Label(excel_options_frame, text="Sheet Name (optional):", bg='black', fg='white').grid(row=1, column=0, sticky='w')
 sheet_name_entry = tk.Entry(excel_options_frame, bg='grey', fg='white')
 sheet_name_entry.grid(row=1, column=1, sticky='w')
-
-# Testing Mode Checkbox
-testing_var = tk.BooleanVar()
-testing_checkbox = tk.Checkbutton(form_frame, text="I'm just testing!", variable=testing_var, bg='black', fg='white', selectcolor='grey')
-testing_checkbox.pack(anchor='w', padx=20, pady=10)
 
 # Submit Button
 submit_button = tk.Button(form_frame, text="Create Project", command=submit_form, bg='grey', fg='white')
