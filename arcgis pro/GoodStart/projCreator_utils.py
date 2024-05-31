@@ -9,7 +9,6 @@ def validate_project_name(project_name):
     return project_name.replace(' ', '_')
 
 def create_folder_structure(base_path, template_path, project_name):
-    print(project_name)
     if base_path.endswith("2024Proj"):
         project_folder = os.path.join(base_path, f"2024_{project_name}")
     else:
@@ -17,22 +16,13 @@ def create_folder_structure(base_path, template_path, project_name):
     shutil.copytree(template_path, project_folder, dirs_exist_ok=True)
     return project_folder
 
-def copy_excel_to_data_folder(excel_path, project_folder):
+def copy_file_to_data_folder(file_path, project_folder):
     data_folder = os.path.join(project_folder, "data")
     os.makedirs(data_folder, exist_ok=True)
-    csv_path = os.path.join(data_folder, os.path.basename(excel_path))
-    shutil.copyfile(excel_path, csv_path)
-    return csv_path
-
-def convert_excel_to_csv(excel_path, sheet_name, data_folder):
-    df = pd.read_excel(excel_path, sheet_name=sheet_name if sheet_name else 0)
-    csv_name = f"{os.path.splitext(os.path.basename(excel_path))[0]}"
-    if sheet_name:
-        csv_name += f"_{sheet_name}"
-    csv_name += ".csv"
-    csv_output_path = os.path.join(data_folder, csv_name)
-    df.to_csv(csv_output_path, index=False)
-    return csv_output_path
+    file_name = os.path.basename(file_path)
+    dest_path = os.path.join(data_folder, file_name)
+    shutil.copyfile(file_path, dest_path)
+    return dest_path
 
 def create_project_from_template(template_project_path, working_folder, project_name):
     new_project_path = os.path.join(working_folder, f"{project_name}.aprx")
@@ -40,67 +30,88 @@ def create_project_from_template(template_project_path, working_folder, project_
     aprx.saveACopy(new_project_path)
     return new_project_path
 
-def update_project(aprx, project_folder, csv_output_path):
-    m = aprx.listMaps("Map")[0]
-    m.addDataFromPath(csv_output_path)
-    aprx.updateFolderConnections([{"connectionString": project_folder, "alias": "", "isHomeFolder": True}], validate=False)
-    return aprx
-
 def set_project_defaults(aprx, working_folder, project_name):
     arcpy.CreateFileGDB_management(working_folder, f"{project_name}.gdb")
     aprx.defaultGeodatabase = os.path.join(working_folder, f"{project_name}.gdb")
     shutil.copyfile(r"P:\Tools\TemplateProject\template.atbx", os.path.join(working_folder, f"{project_name}.atbx"))
     aprx.defaultToolbox = os.path.join(working_folder, f"{project_name}.atbx")
+    aprx.updateFolderConnections([{"connectionString": project_folder, "alias": "", "isHomeFolder": True}], validate=False)
     aprx.save()
 
-def update_status(status_text, sarcastic_mode=False):
-    if sarcastic_mode:
-        sarcastic_messages = {
-            "Creating new project folder and copy structure...": "Oh look, another folder. Just what we needed.",
-            "Copying the Excel file to the data subfolder...": "Because one can never have too many copies of the same Excel file.",
-            "Creating a new project from the template...": "Creating your masterpiece from a template. How original.",
-            "Adding the CSV to the existing map...": "Adding the CSV. Because what's a map without some good old CSV?",
-            "Setting project defaults, then save and open the project...": "Setting defaults. Because who needs customization?",
-            "Project created successfully": "Project done. Go have a coffee."
-        }
-        status_text = sarcastic_messages.get(status_text, status_text)
-    print(status_text)
+def handle_excel_csv(file_path, data_folder):
+    if file_path.endswith(".csv"):
+        return file_path
+    else:
+        df = pd.read_excel(file_path)
+        csv_output_path = os.path.join(data_folder, os.path.splitext(os.path.basename(file_path))[0] + ".csv")
+        df.to_csv(csv_output_path, index=False)
+        return csv_output_path
 
-def create_project(base_project_path, excel_path, sheet_name, project_name, root, sarcastic_mode=False):
+def handle_kml_kmz(file_path, data_folder):
+    layer_output_path = os.path.join(data_folder, os.path.splitext(os.path.basename(file_path))[0] + ".lyr")
+    arcpy.conversion.KMLToLayer(file_path, data_folder)
+    return layer_output_path
+
+def handle_cad(file_path, data_folder):
+    gdb_path = os.path.join(data_folder, os.path.splitext(os.path.basename(file_path))[0] + ".gdb")
+    arcpy.conversion.CADToGeodatabase(file_path, gdb_path)
+    return gdb_path
+
+def update_status(message):
+    print(message)
+
+def create_project(base_path, datasets, project_name, selected_folder):
     try:
         project_name = validate_project_name(project_name)
-
-        excel_path = excel_path.replace('"', '') if excel_path else excel_path
-
         template_path = r"P:\PROJECTS\PROJECT_FOLDER_STRUCTURE"
+        selected_folder_path = os.path.join(base_path, selected_folder)
+        project_folder = create_folder_structure(selected_folder_path, template_path, project_name)
+        data_folder = os.path.join(project_folder, "data")
 
-        project_folder = create_folder_structure(base_project_path, template_path, project_name)
+        for file_path in datasets:
+            if file_path.endswith(('.xlsx', '.xls', '.csv')):
+                update_status(f"Processing Excel/CSV file: {file_path}")
+                handle_excel_csv(file_path, data_folder)
+            elif file_path.endswith(('.kml', '.kmz')):
+                update_status(f"Processing KML/KMZ file: {file_path}")
+                handle_kml_kmz(file_path, data_folder)
+            elif file_path.endswith(('.dwg', '.dxf', '.dgn')):
+                update_status(f"Processing CAD file: {file_path}")
+                handle_cad(file_path, data_folder)
+            else:
+                raise ValueError(f"Unsupported file type: {file_path}")
+
+        update_status(f"Creating project structure at {project_folder}")
+
+        # add the datasets to the map
         working_folder = os.path.join(project_folder, "working")
-
-        update_status("Creating new project folder and copy structure...", sarcastic_mode)
-
-        if excel_path:
-            if not os.path.exists(excel_path):
-                raise FileNotFoundError(f"Excel file not found at {excel_path}.")
-            csv_path = copy_excel_to_data_folder(excel_path, project_folder)
-            update_status("Copying the Excel file to the data subfolder...", sarcastic_mode)
-
-            csv_output_path = convert_excel_to_csv(excel_path, sheet_name, os.path.join(project_folder, "data"))
-
         template_project_path = r"P:\Tools\TemplateProject\template.aprx"
         new_project_path = create_project_from_template(template_project_path, working_folder, project_name)
-        update_status("Creating a new project from the template...", sarcastic_mode)
-
         aprx = arcpy.mp.ArcGISProject(new_project_path)
-        if excel_path:
-            aprx = update_project(aprx, project_folder, csv_output_path)
-            update_status("Adding the CSV to the existing map...", sarcastic_mode)
+        m = aprx.listMaps()[0]
+        for dataset in os.listdir(data_folder):
+            if dataset.endswith(".csv"):
+                m.addDataFromPath(os.path.join(data_folder, dataset))
+            elif dataset.endswith(".lyrx"):
+                m.addDataFromPath(os.path.join(data_folder, dataset))
+                
+            elif dataset.endswith(".gdb"):
+                # if the dataset that endswith lyrx is added to the map
+                # ignore the corresponding gdb with the same name
+                if not os.path.exists(os.path.join(data_folder, dataset + ".lyrx")):
+                    for fc in arcpy.ListFeatureClasses("*", "", dataset):
+                        m.addDataFromPath(os.path.join(data_folder, dataset, fc))
 
-        set_project_defaults(aprx, working_folder, project_name)
-        update_status("Setting project defaults, then save and open the project...", sarcastic_mode)
+            else:
+                raise ValueError(f"Unsupported dataset type: {dataset}")
+            
+        aprx.save()
+        
 
+        update_status(f"Project '{project_name}' created successfully at {project_folder}")
+        
         os.startfile(new_project_path)
-        update_status(f"Project '{project_name}' created successfully", sarcastic_mode)
 
     except Exception as e:
-        update_status(f"Error: {e}", sarcastic_mode)
+        update_status(f"Error: {e}")
+        raise

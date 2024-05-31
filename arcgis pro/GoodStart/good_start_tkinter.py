@@ -1,120 +1,95 @@
 import tkinter as tk
-from tkinter import ttk
-from tkinter import messagebox
+from tkinter import ttk, filedialog, messagebox
 import logging
-import tempfile
 import os
-from projCreator_utils import create_project  # Ensure this import statement is correct
+from projCreator_utils import create_project  
 
 # Set up logging
 logging.basicConfig(filename='error_log.txt', level=logging.ERROR,
                     format='%(asctime)s:%(levelname)s:%(message)s')
 
-def submit_form(event=None):
-    excel_path = excel_path_entry.get()
-    sheet_name = sheet_name_entry.get()
-    project_name = project_name_entry.get()
-    selected_folder = folder_var.get()
-    sarcastic_mode = sarcastic_var.get()
+class ProjectCreatorApp(tk.Tk):
+    def __init__(self):
+        super().__init__()
+        self.title("ArcGIS Pro Project Creator")
+        self.geometry('1040x400')
+        self.configure(bg='black')
+        self.iconbitmap('newproj.ico')  
 
-    try:
-        # Define the base path based on the selected folder
-        base_path = r"P:\PROJECTS"
-        if selected_folder == "2024Proj":
-            project_path = os.path.join(base_path, "2024Proj", "2024_" + project_name)
-        else:
-            project_path = os.path.join(base_path, selected_folder, project_name)
-        
-        # Create the project
-        if excel_path:
-            create_project(project_path, excel_path, sheet_name, project_name, root, sarcastic_mode)
-        else:
-            create_project(project_path, None, None, project_name, root, sarcastic_mode)
-        
-        root.destroy()
-    except FileNotFoundError:
-        error_message = "Excel spreadsheet not found. Please check the path and try again."
-        logging.error(error_message)
-        messagebox.showerror("Error", error_message)
-    except Exception as e:
-        error_message = f"An unexpected error occurred: {str(e)}"
-        logging.error(error_message)
-        messagebox.showerror("Error", error_message)
+        self.dataset_count = 0  # Initialize dataset_count before calling create_widgets
+        self.create_widgets()
 
-# Main GUI setup
-root = tk.Tk()
-root.geometry('800x400')
-root.configure(bg='black')
-root.title("ArcGIS Pro Project Creator")
+    def create_widgets(self):
+        form_frame = tk.Frame(self, bg='black')
+        form_frame.pack(side='left', anchor='n', padx=20, pady=10)
 
-# Set the custom icon (ensure you have the icon file in the correct path)
-icon_path = 'newproj.ico'  # Replace this with the path to your icon file
-root.iconbitmap(icon_path)
+        project_name_frame = tk.Frame(form_frame, bg='black')
+        project_name_frame.pack(anchor='w', padx=20, pady=10)
+        tk.Label(project_name_frame, text="Project Name:", bg='black', fg='white').grid(row=0, column=0, sticky='w')
+        self.project_name_entry = tk.Entry(project_name_frame, bg='grey', fg='white')
+        self.project_name_entry.grid(row=0, column=1, sticky='w')
 
-# Main Form Frame
-form_frame = tk.Frame(root, bg='black')
-form_frame.pack(side='left', anchor='n', padx=20, pady=10)
+        folder_frame = tk.Frame(form_frame, bg='black')
+        folder_frame.pack(anchor='w', padx=20, pady=10)
+        tk.Label(folder_frame, text="P:\\PROJECTS\\", bg='black', fg='white').pack(side='left')
+        self.folder_var = tk.StringVar(value="2024Proj")
+        folder_dropdown = ttk.Combobox(folder_frame, textvariable=self.folder_var, values=["2024Proj", "MPO_Projects", "Special_Projects"])
+        folder_dropdown.pack(side='left', padx=5)
 
-# Project Name Frame
-project_name_frame = tk.Frame(form_frame, bg='black')
-project_name_frame.pack(anchor='w', padx=20, pady=10)
+        datasets_frame = tk.Frame(form_frame, bg='black')
+        datasets_frame.pack(anchor='w', padx=20, pady=10)
+        tk.Label(datasets_frame, text="Datasets to Include:", bg='black', fg='white').grid(row=0, column=0, sticky='w')
+        self.datasets_frame = tk.Frame(datasets_frame, bg='black')
+        self.datasets_frame.grid(row=1, column=0, sticky='w')
+        self.add_dataset_field()
 
-tk.Label(project_name_frame, text="Project Name:", bg='black', fg='white').grid(row=0, column=0, sticky='w')
-project_name_entry = tk.Entry(project_name_frame, bg='grey', fg='white')
-project_name_entry.grid(row=0, column=1, sticky='w')
+        submit_button = tk.Button(form_frame, text="Create Project", command=self.submit_form, bg='grey', fg='white')
+        submit_button.pack(anchor='w', padx=20, pady=10)
 
-# Folder Selection Frame
-folder_frame = tk.Frame(form_frame, bg='black')
-folder_frame.pack(anchor='w', padx=20, pady=10)
+        status_label = tk.Label(form_frame, text="", bg='black', fg='white')
+        status_label.pack(anchor='w', padx=20, pady=10)
+        self.status_label = status_label
 
-tk.Label(folder_frame, text="P:\\PROJECTS\\", bg='black', fg='white').pack(side='left')
+        info_frame = tk.Frame(self, bg='black')
+        info_frame.pack(side='right', anchor='n', padx=20, pady=10)
+        info_text = (
+            "This tool is for creating new projects. "
+            "If you have any questions or comments, please contact Daniel McVey."
+        )
+        info_label = tk.Label(info_frame, text=info_text, bg='black', fg='white', wraplength=200, justify='left')
+        info_label.pack(anchor='n', padx=20, pady=10)
 
-folder_var = tk.StringVar(value="2024Proj")
-folder_dropdown = ttk.Combobox(folder_frame, textvariable=folder_var, values=["2024Proj", "MPO_Projects", "Special_Projects"])
-folder_dropdown.pack(side='left', padx=5)
+    def add_dataset_field(self):
+        row = self.dataset_count
+        entry = tk.Entry(self.datasets_frame, bg='grey', fg='white', width=100)
+        entry.grid(row=row, column=0, padx=(0, 10), pady=5, sticky='w')
+        browse_button = tk.Button(self.datasets_frame, text="Browse", command=lambda e=entry: self.browse_file(e), bg='grey', fg='white')
+        browse_button.grid(row=row, column=1, padx=5, pady=5, sticky='w')
+        self.dataset_count += 1
 
-# Excel Options Frame
-excel_options_frame = tk.Frame(form_frame, bg='black')
-excel_options_frame.pack(anchor='w', padx=20, pady=10)
+    def browse_file(self, entry):
+        file_path = filedialog.askopenfilename()
+        if file_path:
+            entry.delete(0, tk.END)
+            entry.insert(0, file_path)
+            self.add_dataset_field()
 
-tk.Label(excel_options_frame, text="Excel Spreadsheet Path (optional):", bg='black', fg='white').grid(row=0, column=0, sticky='w')
-excel_path_entry = tk.Entry(excel_options_frame, bg='grey', fg='white')
-excel_path_entry.grid(row=0, column=1, sticky='w')
+    def submit_form(self):
+        project_name = self.project_name_entry.get()
+        selected_folder = self.folder_var.get()
+        datasets = [entry.get() for entry in self.datasets_frame.winfo_children() if isinstance(entry, tk.Entry) and entry.get()]
 
-tk.Label(excel_options_frame, text="Sheet Name (optional):", bg='black', fg='white').grid(row=1, column=0, sticky='w')
-sheet_name_entry = tk.Entry(excel_options_frame, bg='grey', fg='white')
-sheet_name_entry.grid(row=1, column=1, sticky='w')
+        try:
+            # Create the project
+            create_project(r"P:\PROJECTS", datasets, project_name, selected_folder)
+            self.destroy()
+        except FileNotFoundError as e:
+            logging.error(e)
+            messagebox.showerror("Error", str(e))
+        except Exception as e:
+            logging.error(e)
+            messagebox.showerror("Error", str(e))
 
-# Sarcastic Mode Frame
-sarcastic_frame = tk.Frame(root, bg='black', width=1, height=1)
-sarcastic_frame.pack(side='bottom', anchor='e', padx=1, pady=1)
-
-# Sarcastic Mode Checkbox
-sarcastic_var = tk.BooleanVar()
-sarcastic_checkbox = tk.Checkbutton(sarcastic_frame, text="Enable Snarky Comments", variable=sarcastic_var, bg='black', fg='white', selectcolor='grey')
-sarcastic_checkbox.pack(side='right')
-
-# Submit Button
-submit_button = tk.Button(form_frame, text="Create Project", command=submit_form, bg='grey', fg='white')
-submit_button.pack(anchor='w', padx=20, pady=10)
-
-# Status Label
-status_label = tk.Label(form_frame, text="", bg='black', fg='white')
-status_label.pack(anchor='w', padx=20, pady=10)
-
-# Information Frame
-info_frame = tk.Frame(root, bg='black')
-info_frame.pack(side='right', anchor='n', padx=20, pady=10)
-
-# Information Label
-info_text = (
-    "This tool is for creating new projects. "
-    "If you have any questions or comments, please contact Daniel McVey."
-)
-info_label = tk.Label(info_frame, text=info_text, bg='black', fg='white', wraplength=200, justify='left')
-info_label.pack(anchor='n', padx=20, pady=10)
-
-# Bind 'Enter' key to submit_form function
-root.bind('<Return>', submit_form)
-
-root.mainloop()
+if __name__ == "__main__":
+    app = ProjectCreatorApp()
+    app.mainloop()
