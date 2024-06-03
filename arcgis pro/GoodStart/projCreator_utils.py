@@ -16,13 +16,6 @@ def create_folder_structure(base_path, template_path, project_name):
     shutil.copytree(template_path, project_folder, dirs_exist_ok=True)
     return project_folder
 
-def copy_file_to_data_folder(file_path, project_folder):
-    data_folder = os.path.join(project_folder, "data")
-    os.makedirs(data_folder, exist_ok=True)
-    file_name = os.path.basename(file_path)
-    dest_path = os.path.join(data_folder, file_name)
-    shutil.copyfile(file_path, dest_path)
-    return dest_path
 
 def create_project_from_template(template_project_path, working_folder, project_name):
     new_project_path = os.path.join(working_folder, f"{project_name}.aprx")
@@ -30,11 +23,11 @@ def create_project_from_template(template_project_path, working_folder, project_
     aprx.saveACopy(new_project_path)
     return new_project_path
 
-def set_project_defaults(aprx, working_folder, project_name):
-    arcpy.CreateFileGDB_management(working_folder, f"{project_name}.gdb")
-    aprx.defaultGeodatabase = os.path.join(working_folder, f"{project_name}.gdb")
-    shutil.copyfile(r"P:\Tools\TemplateProject\template.atbx", os.path.join(working_folder, f"{project_name}.atbx"))
-    aprx.defaultToolbox = os.path.join(working_folder, f"{project_name}.atbx")
+def set_project_defaults(aprx, project_folder, project_name):
+    arcpy.CreateFileGDB_management(project_folder, f"{project_name}.gdb")
+    aprx.defaultGeodatabase = os.path.join(project_folder, f"{project_name}.gdb")
+    shutil.copyfile(r"P:\Tools\TemplateProject\template.atbx", os.path.join(project_folder, f"{project_name}.atbx"))
+    aprx.defaultToolbox = os.path.join(project_folder, f"{project_name}.atbx")
     aprx.updateFolderConnections([{"connectionString": project_folder, "alias": "", "isHomeFolder": True}], validate=False)
     aprx.save()
 
@@ -66,9 +59,8 @@ def update_status(message):
 def create_project(base_path, datasets, project_name, selected_folder):
     try:
         project_name = validate_project_name(project_name)
-        template_path = r"P:\PROJECTS\PROJECT_FOLDER_STRUCTURE"
         selected_folder_path = os.path.join(base_path, selected_folder)
-        project_folder = create_folder_structure(selected_folder_path, template_path, project_name)
+        project_folder = create_folder_structure(selected_folder_path, r"P:\PROJECTS\PROJECT_FOLDER_STRUCTURE", project_name)
         data_folder = os.path.join(project_folder, "data")
 
         for file_path in datasets:
@@ -107,9 +99,8 @@ def create_project(base_path, datasets, project_name, selected_folder):
 
             else:
                 raise ValueError(f"Unsupported dataset type: {dataset}")
-            
+        set_project_defaults(aprx, project_folder, project_name)
         aprx.save()
-        
 
         update_status(f"Project '{project_name}' created successfully at {project_folder}")
         
