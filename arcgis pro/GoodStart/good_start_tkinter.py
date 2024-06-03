@@ -59,7 +59,9 @@ class ProjectCreatorApp(tk.Tk):
 
             Enter a project name, select a folder, and add datasets to include in the project.
 
-            Excel/CSV fully supported. KML/KMZ and CAD files coming soon!
+            Excel/CSV fully supported. Other formats coming soon!
+                           
+            Shapefiles, FGDB feature classes, KMZ, CAD...
 
             If you have any questions or comments, please contact Daniel McVey.
         """)
