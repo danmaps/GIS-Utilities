@@ -40,11 +40,14 @@ def set_project_defaults(aprx, working_folder, project_name):
 
 def handle_excel_csv(file_path, data_folder):
     if file_path.endswith(".csv"):
+        csv_output_path = os.path.join(data_folder, os.path.basename(file_path))
+        shutil.copyfile(file_path, csv_output_path)
         return file_path
-    else:
-        df = pd.read_excel(file_path)
-        csv_output_path = os.path.join(data_folder, os.path.splitext(os.path.basename(file_path))[0] + ".csv")
-        df.to_csv(csv_output_path, index=False)
+    else: # Excel file
+        data = pd.read_excel(file_path, sheet_name=None)
+        for sheet_name, df in data.items():
+            csv_output_path = os.path.join(data_folder, os.path.splitext(os.path.basename(file_path))[0] + "_" + sheet_name + ".csv")
+            df.to_csv(csv_output_path, index=False)
         return csv_output_path
 
 def handle_kml_kmz(file_path, data_folder):

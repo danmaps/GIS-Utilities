@@ -1,8 +1,9 @@
 import tkinter as tk
 from tkinter import ttk, filedialog, messagebox
 import logging
-import os
-from projCreator_utils import create_project  
+from projCreator_utils import create_project
+from textwrap import dedent
+
 
 # Set up logging
 logging.basicConfig(filename='error_log.txt', level=logging.ERROR,
@@ -49,15 +50,25 @@ class ProjectCreatorApp(tk.Tk):
         status_label = tk.Label(form_frame, text="", bg='black', fg='white')
         status_label.pack(anchor='w', padx=20, pady=10)
         self.status_label = status_label
-
-        info_frame = tk.Frame(self, bg='black')
+        
+        info_frame = tk.Frame(self, bg='black', bd=0)
         info_frame.pack(side='right', anchor='n', padx=20, pady=10)
-        info_text = (
-            "This tool is for creating new projects. "
-            "If you have any questions or comments, please contact Daniel McVey."
-        )
-        info_label = tk.Label(info_frame, text=info_text, bg='black', fg='white', wraplength=200, justify='left')
-        info_label.pack(anchor='n', padx=20, pady=10)
+
+        info_text = dedent("""\
+            Welcome!
+
+            Enter a project name, select a folder, and add datasets to include in the project.
+
+            Excel/CSV fully supported. KML/KMZ and CAD files coming soon!
+
+            If you have any questions or comments, please contact Daniel McVey.
+        """)
+
+        info_text_widget = tk.Text(info_frame, bg='black', fg='white', wrap='word', width=50, height=15, padx=10, pady=10, font=("Arial", 10), bd=0)
+        info_text_widget.insert(tk.END, info_text)
+        info_text_widget.config(state=tk.DISABLED)  # Make the Text widget read-only
+        info_text_widget.pack(anchor='n', padx=20, pady=10)
+
 
     def add_dataset_field(self):
         row = self.dataset_count
