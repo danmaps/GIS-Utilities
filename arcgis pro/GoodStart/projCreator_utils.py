@@ -104,6 +104,9 @@ def create_project(base_path, datasets, project_name, selected_folder):
             elif file_path.endswith((".dwg", ".dxf", ".dgn")):
                 update_status(f"Processing CAD file: {file_path}")
                 handle_cad(file_path, data_folder)
+            elif file_path.endswith((".shp", ".gdb")):
+                update_status(f"Copying dataset: {file_path}")
+                shutil.copytree(file_path, os.path.join(data_folder, os.path.basename(file_path)))
             else:
                 raise ValueError(f"Unsupported file type: {file_path}")
 
