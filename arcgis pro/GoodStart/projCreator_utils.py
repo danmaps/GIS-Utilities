@@ -31,16 +31,16 @@ def create_project_from_template(template_project_path, working_folder, project_
     return new_project_path
 
 
-def set_project_defaults(aprx, project_folder, project_name):
-    arcpy.CreateFileGDB_management(project_folder, f"{project_name}.gdb")
-    aprx.defaultGeodatabase = os.path.join(project_folder, f"{project_name}.gdb")
+def set_project_defaults(aprx, folderPath, projectName):
+    arcpy.CreateFileGDB_management(folderPath, f"{projectName}.gdb")
+    aprx.defaultGeodatabase = os.path.join(folderPath, f"{projectName}.gdb")
     shutil.copyfile(
         r"P:\Tools\TemplateProject\template.atbx",
-        os.path.join(project_folder, f"{project_name}.atbx"),
+        os.path.join(folderPath, f"{projectName}.atbx"),
     )
-    aprx.defaultToolbox = os.path.join(project_folder, f"{project_name}.atbx")
+    aprx.defaultToolbox = os.path.join(folderPath, f"{projectName}.atbx")
     aprx.updateFolderConnections(
-        [{"connectionString": project_folder, "alias": "", "isHomeFolder": True}],
+        [{"connectionString": folderPath, "alias": "", "isHomeFolder": True}],
         validate=False,
     )
     aprx.save()
@@ -132,7 +132,7 @@ def create_project(base_path, datasets, project_name, selected_folder):
 
             else:
                 raise ValueError(f"Unsupported dataset type: {dataset}")
-        set_project_defaults(aprx, project_folder, project_name)
+        set_project_defaults(aprx, working_folder, project_name)
         aprx.save()
 
         update_status(
