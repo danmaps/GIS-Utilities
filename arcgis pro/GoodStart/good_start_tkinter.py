@@ -45,7 +45,7 @@ class ProjectCreatorApp(tk.Tk):
         folder_dropdown = ttk.Combobox(
             folder_frame,
             textvariable=self.folder_var,
-            values=["2024Proj", "MPO_Projects", "Special_Projects"],
+            values=["2024Proj", "MPO_Projects", "Special_Projects","Data_Requests"],
         )
         folder_dropdown.pack(side="left", padx=5)
 
@@ -128,6 +128,8 @@ class ProjectCreatorApp(tk.Tk):
     def submit_form(self):
         project_name = self.project_name_entry.get()
         selected_folder = self.folder_var.get()
+        if selected_folder == "Data_Requests":
+            selected_folder = "Special_Projects\WSD_GIS_Schema\Data Requests"
         datasets = [
             entry.get()
             for entry in self.datasets_frame.winfo_children()

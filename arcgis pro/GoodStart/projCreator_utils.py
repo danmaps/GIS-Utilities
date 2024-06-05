@@ -89,10 +89,14 @@ def create_project(base_path, datasets, project_name, selected_folder):
     try:
         project_name = validate_project_name(project_name)
         selected_folder_path = os.path.join(base_path, selected_folder)
+        folder_structure = r"P:\PROJECTS\PROJECT_FOLDER_STRUCTURE"
+        if selected_folder == "Data_Requests":
+            folder_structure = r"P:\PROJECTS\Special_Projects\WSD_GIS_Schema\Data_Requests\X_DR_FOLDER_STRUCTURE"
         project_folder = create_folder_structure(
-            selected_folder_path, r"P:\PROJECTS\PROJECT_FOLDER_STRUCTURE", project_name
+            selected_folder_path, folder_structure, project_name
         )
-        data_folder = os.path.join(project_folder, "data")
+        
+        data_folder = os.path.join(project_folder, "Data")
 
         for file_path in datasets:
             if file_path.endswith((".xlsx", ".xls", ".csv")):
@@ -113,7 +117,9 @@ def create_project(base_path, datasets, project_name, selected_folder):
         update_status(f"Creating project structure at {project_folder}")
 
         # add the datasets to the map
-        working_folder = os.path.join(project_folder, "working")
+        working_folder = os.path.join(project_folder, "Working")
+        if selected_folder == "Data_Requests":
+            working_folder = os.path.join(project_folder, "Data")
         template_project_path = r"P:\Tools\TemplateProject\template.aprx"
         new_project_path = create_project_from_template(
             template_project_path, working_folder, project_name
