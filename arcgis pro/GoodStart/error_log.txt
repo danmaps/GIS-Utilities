@@ -18,3 +18,9 @@ ERROR 000735: Dataset: Value is required
 ERROR 000532: A valid reference scale value must be set
 Failed to execute (CADToGeodatabase).
 
+2024-06-07 13:39:52,704:ERROR:Valid project name is required.
+2024-06-07 16:04:15,556:ERROR:'NoneType' object is not iterable
+2024-06-07 16:10:16,893:ERROR:'NoneType' object is not iterable
+2024-06-07 16:17:38,816:ERROR:'NoneType' object is not iterable
+2024-06-07 16:27:42,069:ERROR:'NoneType' object is not iterable
+2024-06-07 16:30:17,358:ERROR:'NoneType' object is not iterable

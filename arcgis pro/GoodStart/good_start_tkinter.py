@@ -20,7 +20,6 @@ class ProjectCreatorApp(tk.Tk):
         self.geometry("1040x400")
         self.configure(bg="black")
         self.iconbitmap("newproj.ico")
-
         self.dataset_count = 0  # Initialize dataset_count before calling create_widgets
         self.create_widgets()
 
@@ -38,21 +37,21 @@ class ProjectCreatorApp(tk.Tk):
 
         folder_frame = tk.Frame(form_frame, bg="black")
         folder_frame.pack(anchor="w", padx=20, pady=10)
-        tk.Label(folder_frame, text="P:\\PROJECTS\\", bg="black", fg="white").pack(
+        tk.Label(folder_frame, text="Target Folder:", bg="black", fg="white").pack(
             side="left"
         )
-        self.folder_var = tk.StringVar(value="2024Proj")
+        self.folder_var = tk.StringVar(value=r"c:\temp")
         folder_dropdown = ttk.Combobox(
             folder_frame,
             textvariable=self.folder_var,
-            values=["2024Proj", "MPO_Projects", "Special_Projects","Data_Requests"],
+            values=[r"c:\temp","2024Proj","MPO_Projects","Special_Projects","Data_Requests"],
         )
         folder_dropdown.pack(side="left", padx=5)
 
         datasets_frame = tk.Frame(form_frame, bg="black")
         datasets_frame.pack(anchor="w", padx=20, pady=10)
         tk.Label(
-            datasets_frame, text="Datasets to Include:", bg="black", fg="white"
+            datasets_frame, text="Datasets to include (optional):", bg="black", fg="white"
         ).grid(row=0, column=0, sticky="w")
         self.datasets_frame = tk.Frame(datasets_frame, bg="black")
         self.datasets_frame.grid(row=1, column=0, sticky="w")
