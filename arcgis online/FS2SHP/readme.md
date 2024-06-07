@@ -1,22 +1,22 @@
 
 # Work Orders Shapefile Export and Split Tool
 
-This tool is designed to export work orders from an ArcGIS Online feature service to a shapefile and then split that shapefile into separate shapefiles based on the 'WorkOrder' attribute. The output is organized into a specified folder structure and zipped for convenient storage and transfer.
+This tool is designed to export work orders from an ArcGIS Online feature service to a shapefile and then split that shapefile into separate shapefiles based on the 'WorkOrder' attribute. The output is organized into a specific folder structure and zipped for convenient storage and transfer.
 
 ## Folder Structure
 
 The tool will create the following folder structure:
 
 ```
-WestCovina_SLs
-    WorkOrders_DateTime.zip
-        WorkOrders_DateTime.zip
-            WorkOrders_DateTime.shp
-        separate
-            WorkOrder1_DateTime.zip
-                WorkOrder1_DateTime.shp
-            WorkOrder2_DateTime.zip
-                WorkOrder2_DateTime.shp
+WestCovina_SLs/
+├── WorkOrders_DateTime.zip
+│   ├── WorkOrders_DateTime.zip
+│   │   └── WorkOrders_DateTime.shp
+│   └── separate
+│       ├── WorkOrder1_DateTime.zip
+│       │   └── WorkOrder1_DateTime.shp
+│       └── WorkOrder2_DateTime.zip
+│           └── WorkOrder2_DateTime.shp
 ```
 
 ## Requirements
@@ -29,9 +29,9 @@ WestCovina_SLs
 
 ## Setup
 
-Update the following paths and parameters in the script as needed:
-    - `service_item_id`: The ID of the feature service item in ArcGIS Online.
-    - `onedrive_folder`: The local path where the exported shapefiles will be stored.
+Update the following paths and parameters in the script as needed
+- `service_item_id`: The ID of the feature service item in ArcGIS Online.
+- `onedrive_folder`: The local path where the exported shapefiles will be stored.
 
 ## Usage
 
@@ -58,23 +58,6 @@ out_name = "WorkOrders_" + today_date
 
 if count > prev_count:
     arcpy.management.CopyFeatures(service_item.url + r"/0", os.path.join(onedrive_folder, out_name, out_name) + ".shp")
-```
-
-### Explode Shapefile
-
-The `explode_shapefile` function splits the exported shapefile into separate shapefiles based on the 'WorkOrder' attribute.
-
-```python
-def explode_shapefile(input_shp, output_folder, today_date):
-    # Implementation
-```
-
-### Zipping Files
-
-The script zips the exported and split shapefiles for storage and transfer.
-
-```python
-shutil.make_archive(zip_name, 'zip', out_dir)
 ```
 
 ### Count Management
