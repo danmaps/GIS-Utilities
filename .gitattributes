@@ -1,0 +1,2 @@
+# Treat Excel files as binary and ignore changes
+*.xlsx binary -diff
