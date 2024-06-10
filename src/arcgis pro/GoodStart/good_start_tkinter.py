@@ -70,7 +70,7 @@ class ProjectCreatorApp(tk.Tk):
         info_frame.pack(side="right", anchor="n", padx=20, pady=10)
 
         info_text = dedent(
-            """\
+            r"""\
             Welcome!
 
             Enter a project name, select a folder (defaults to "c:\temp" just for testing), and add optionally datasets to include in the project.
