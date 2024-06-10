@@ -73,9 +73,9 @@ class ProjectCreatorApp(tk.Tk):
             """\
             Welcome!
 
-            Enter a project name, select a folder, and add datasets to include in the project.
+            Enter a project name, select a folder (defaults to "c:\temp" just for testing), and add optionally datasets to include in the project.
 
-            Excel/CSV, Shapefile, KMZ, CAD, and GDB supported.
+            Excel/CSV, Shapefile, KMZ, CAD, and GDB supported. They'll automatically live in the Data folder and be added to the map!
 
             If you have any questions or comments, please contact Daniel McVey.
         """
@@ -111,7 +111,7 @@ class ProjectCreatorApp(tk.Tk):
         
         dir_button = tk.Button(
             self.datasets_frame,
-            text="Browse Directory",
+            text="Browse Directory (for .gdb)",
             command=lambda e=entry: self.browse_directory(e),
         )
         dir_button.grid(row=row, column=2, padx=5, pady=5, sticky="w")
