@@ -87,7 +87,7 @@ class ProjectCreatorApp(tk.Tk):
             fg="white",
             wrap="word",
             width=50,
-            height=15,
+            height=400,
             padx=10,
             pady=10,
             font=("Arial", 10),
