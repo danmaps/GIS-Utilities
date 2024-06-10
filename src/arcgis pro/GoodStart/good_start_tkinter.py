@@ -17,7 +17,7 @@ class ProjectCreatorApp(tk.Tk):
         self.title("ArcGIS Pro Project Creator")
         self.geometry("1200x400")
         self.configure(bg="black")
-        self.iconbitmap("newproj.ico")
+        self.iconbitmap("src\arcgis pro\GoodStart\newproj.ico")
         self.dataset_count = 0  # Initialize dataset_count before calling create_widgets
         self.create_widgets()
 
