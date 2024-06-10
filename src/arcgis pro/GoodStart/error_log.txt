@@ -1,0 +1,69 @@
+2024-05-29 11:46:50,291:ERROR:An unexpected error occurred: [WinError 32] The process cannot access the file because it is being used by another process: 'C:\\Users\\mcveydb\\AppData\\Local\\Temp\\tmp3ncwwakg\\test123\\2024_test123\\Working\\test123.gdb\\_gdb.D266027.4860.27244.sr.lock'
+2024-05-29 11:47:33,324:ERROR:An unexpected error occurred: [WinError 32] The process cannot access the file because it is being used by another process: 'C:\\Users\\mcveydb\\AppData\\Local\\Temp\\tmpoorz45r4\\test1232\\2024_test1232\\Working\\test1232.gdb\\_gdb.D266027.4860.27244.sr.lock'
+2024-05-29 16:04:46,688:ERROR:An unexpected error occurred: create_project() missing 1 required positional argument: 'root'
+2024-05-29 16:05:37,026:ERROR:An unexpected error occurred: create_project() missing 1 required positional argument: 'root'
+2024-05-30 12:13:22,175:ERROR:CURRENT
+2024-05-30 12:30:20,023:ERROR:Failed to execute. Parameters are not valid.
+ERROR 000732: Output Geodatabase: Dataset P:\PROJECTS\2024Proj\2024_asdfasdf\data\CAD.gdb does not exist or is not supported
+ERROR 000735: Dataset: Value is required
+ERROR 000532: A valid reference scale value must be set
+Failed to execute (CADToGeodatabase).
+
+2024-05-30 12:32:38,071:ERROR:'NoneType' object is not iterable
+2024-05-30 13:58:41,821:ERROR:'NoneType' object is not iterable
+2024-05-31 09:41:39,079:ERROR:Valid project name is required.
+2024-05-31 09:41:53,666:ERROR:Failed to execute. Parameters are not valid.
+ERROR 000732: Output Geodatabase: Dataset P:\PROJECTS\2024Proj\2024_jijijij\data\architectural_example-imperial.gdb does not exist or is not supported
+ERROR 000735: Dataset: Value is required
+ERROR 000532: A valid reference scale value must be set
+Failed to execute (CADToGeodatabase).
+
+2024-06-07 13:39:52,704:ERROR:Valid project name is required.
+2024-06-07 16:04:15,556:ERROR:'NoneType' object is not iterable
+2024-06-07 16:10:16,893:ERROR:'NoneType' object is not iterable
+2024-06-07 16:17:38,816:ERROR:'NoneType' object is not iterable
+2024-06-07 16:27:42,069:ERROR:'NoneType' object is not iterable
+2024-06-07 16:30:17,358:ERROR:'NoneType' object is not iterable
+2024-06-10 09:56:13,322:ERROR:[WinError 267] The directory name is invalid: 'C:/Users/mcveydb/dev/GIS-Utilities/arcgis pro/GoodStart/tests/territory.shp'
+2024-06-10 09:56:32,061:ERROR:[WinError 267] The directory name is invalid: 'C:/Users/mcveydb/dev/GIS-Utilities/arcgis pro/GoodStart/tests/territory.shp'
+2024-06-10 09:59:43,955:ERROR:ERROR 000258: Output c:\Temp\asdf123\Working\asdf123.gdb already exists
+Failed to execute (CreateFileGDB).
+
+2024-06-10 10:16:04,429:ERROR:'function' object is not subscriptable
+2024-06-10 10:19:08,927:ERROR:cannot access local variable 'dataset' where it is not associated with a value
+2024-06-10 10:20:59,461:ERROR:cannot access local variable 'dataset' where it is not associated with a value
+2024-06-10 11:44:50,049:ERROR:'NoneType' object is not iterable
+2024-06-10 12:01:13,502:ERROR:'NoneType' object is not iterable
+2024-06-10 12:02:37,034:ERROR:'NoneType' object is not iterable
+2024-06-10 12:07:40,571:ERROR:'NoneType' object is not iterable
+2024-06-10 12:10:07,104:ERROR:'NoneType' object is not iterable
+2024-06-10 12:11:20,260:ERROR:'NoneType' object is not iterable
+2024-06-10 12:13:29,832:ERROR:ERROR 000260: Failed to copy C:/Users/mcveydb/dev/GIS-Utilities/arcgis pro/GoodStart/tests/geodatabase.gdb into c:\Temp\sdf\Data\geodatabase.gdb
+Failed to execute (Copy).
+
+2024-06-10 12:13:56,571:ERROR:ERROR 000260: Failed to copy C:/Users/mcveydb/dev/GIS-Utilities/arcgis pro/GoodStart/tests/geodatabase.gdb into c:\Temp\sdf12\Data\geodatabase.gdb
+Failed to execute (Copy).
+
+2024-06-10 12:14:22,887:ERROR:ERROR 000260: Failed to copy C:/Users/mcveydb/dev/GIS-Utilities/arcgis pro/GoodStart/tests/geodatabase.gdb into c:\Temp\aasdf\Data\geodatabase.gdb
+Failed to execute (Copy).
+
+2024-06-10 12:16:06,471:ERROR:ERROR 000260: Failed to copy C:/Users/mcveydb/dev/GIS-Utilities/arcgis pro/GoodStart/tests/geodatabase.gdb into c:\Temp\r\Data\geodatabase.gdb
+Failed to execute (Copy).
+
+2024-06-10 12:31:22,940:ERROR:ERROR 000260: Failed to copy C:/Users/mcveydb/dev/GIS-Utilities/arcgis pro/GoodStart/tests/geodatabase.gdb into c:\Temp\fdsffff\Data\geodatabase.gdb
+Failed to execute (Copy).
+
+2024-06-10 12:37:39,484:ERROR:ERROR 000260: Failed to copy C:\Users\mcveydb\dev\GIS-Utilities\arcgis pro\GoodStart\tests\geodatabase.gdb into c:\Temp\v\Data\geodatabase.gdb
+Failed to execute (Copy).
+
+2024-06-10 12:44:15,734:ERROR:'str' object has no attribute 'name'
+2024-06-10 12:52:03,774:ERROR:Valid project name is required.
+2024-06-10 13:01:29,391:ERROR:Failed to execute. Parameters are not valid.
+ERROR 000732: Output Geodatabase: Dataset c:\temp\cad\Data\architectural_example-imperial.gdb does not exist or is not supported
+ERROR 000735: Dataset: Value is required
+ERROR 000532: A valid reference scale value must be set
+Failed to execute (CADToGeodatabase).
+
+2024-06-10 13:12:59,042:ERROR:ERROR 160331: The table name is invalid.
+Failed to execute (CADToGeodatabase).
+
