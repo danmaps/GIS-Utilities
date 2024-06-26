@@ -120,6 +120,10 @@ def fetch_geojson(api_key, query, output_layer_name):
         run_id = submit_message(api_key, thread_id, query)
         run_status = wait_on_run(api_key, thread_id, run_id)
         geojson_data = get_response(api_key, thread_id)
+
+        # Add debugging to inspect the raw GeoJSON response
+        arcpy.AddMessage(f"Raw GeoJSON data: {geojson_data[0]}")
+
         geojson_data = json.loads(geojson_data[0])  # Assuming single response for simplicity
         geometry_type = infer_geometry_type(geojson_data)
     except Exception as e:
