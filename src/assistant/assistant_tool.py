@@ -141,6 +141,7 @@ def fetch_geojson(api_key, query, output_layer_name):
         active_map = aprx.activeMap
         arcpy.AddMessage(os.path.join(aprx.defaultGeodatabase, output_layer_name))
         active_map.addDataFromPath(os.path.join(aprx.defaultGeodatabase, output_layer_name))
+        active_map.extent = active_map.listLayers(output_layer_name)[0].getExtent()
 
 if __name__ == "__main__":
     api_key = arcpy.GetParameterAsText(0)
