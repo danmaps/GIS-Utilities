@@ -1,3 +1,43 @@
+# todo:
+#   add dynamic assistant creation step
+#   record a compelling demo
+
+# potential features:
+#   conversation context (create a point, ok thanks, now buffer that)
+#   
+#   add context
+#       layers from active map
+#       properties like on/off, extent, geometry type, feature count, symbology, fields
+#       map properties, like extent
+#       current view as a png
+#       
+#   give the AI abilities
+#       turn layers on/off
+#       make selections
+#       pan/zoom, zoom to layer, zoom to selection
+#       use geoprocessing tools (with code interpreter?)
+#
+#   sounds like a mixture of assistants
+#       so far i've just got a simple blind feature layer creator
+#       if i give it vision and some friends to talk to it'll have a better time
+#   
+#   attaching data
+#       instead of winging it, use authoritative references to existing geometry
+#       need to clarify if we are talking about reproducing geometry or using it for inspiration
+#
+#   "watch" the user operate editing tools and then draw on the map in a similar way
+#       continue drawing
+#       like a copilot for editing GIS data
+#       need something like github copilot tab complete, where the suggestions are shown to the user and approved/dismissed
+#       record a macro, start drawing, the information about the drawing and how it related to existing geometry is saved
+#       this information is used by the AI as a "style guide" for continued drawing, which it does
+#
+#   enrich existing data with ai
+#       add a column to an existing table with the result of the ai prompt
+#       like existing excel/google sheets plugins
+#       must be able to refer to existing columns in the dataset by name
+#       compelling demo idea: 1. all 50 us state capitals 2. a fun fact about this city
+
 import requests
 import time
 import arcpy
@@ -130,7 +170,7 @@ def fetch_geojson(api_key, query, output_layer_name):
         arcpy.AddError(str(e))
         return
 
-    geojson_file = "output.geojson"
+    geojson_file = os.path.join("geojson_output",f"{output_layer_name}.geojson")
     with open(geojson_file, 'w') as f:
         json.dump(geojson_data, f)
 
@@ -139,10 +179,30 @@ def fetch_geojson(api_key, query, output_layer_name):
     aprx = arcpy.mp.ArcGISProject("CURRENT")
     if aprx.activeMap:
         active_map = aprx.activeMap
-        arcpy.AddMessage(os.path.join(aprx.defaultGeodatabase, output_layer_name))
-        active_map.addDataFromPath(os.path.join(aprx.defaultGeodatabase, output_layer_name))
-        active_map.extent = active_map.listLayers(output_layer_name)[0].getExtent()
+        output_layer_path = os.path.join(aprx.defaultGeodatabase, output_layer_name)
+        arcpy.AddMessage(f"Adding layer from: {output_layer_path}")
+        
+        try:
+            active_map.addDataFromPath(output_layer_path)
+            layer = active_map.listLayers(output_layer_name)[0]
+            
+            # Get the active view
+            active_view = aprx.activeView
+            
+            #if isinstance(active_view, arcpy.mp.MapView):
+            # Get the extent using getLayerExtent
+            extent = active_view.getLayerExtent(layer)
+            if extent:
+                active_view.camera.setExtent(extent)
+                arcpy.AddMessage(f"Layer '{output_layer_name}' added and extent set successfully.")
+            else:
+                arcpy.AddWarning(f"Unable to get extent for layer '{output_layer_name}'.")
 
+        except Exception as e:
+            arcpy.AddError(f"Error processing layer: {str(e)}")
+    else:
+        arcpy.AddWarning("No active map found in the current project.")
+        
 if __name__ == "__main__":
     api_key = arcpy.GetParameterAsText(0)
     query = arcpy.GetParameterAsText(1)
