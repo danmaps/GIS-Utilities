@@ -1,6 +1,7 @@
 # todo:
-#   add dynamic assistant creation step
+#   add dynamic assistant creation step (this allows me to open source the whole project and instruct others on how to use it)
 #   record a compelling demo
+#   handle too-large geojson output gracefully instead of a cryptic error message
 
 # potential features:
 #   conversation context (create a point, ok thanks, now buffer that)
@@ -32,11 +33,7 @@
 #       record a macro, start drawing, the information about the drawing and how it related to existing geometry is saved
 #       this information is used by the AI as a "style guide" for continued drawing, which it does
 #
-#   enrich existing data with ai
-#       add a column to an existing table with the result of the ai prompt
-#       like existing excel/google sheets plugins
-#       must be able to refer to existing columns in the dataset by name
-#       compelling demo idea: 1. all 50 us state capitals 2. a fun fact about this city
+
 
 import requests
 import time
@@ -207,10 +204,5 @@ if __name__ == "__main__":
     api_key = arcpy.GetParameterAsText(0)
     query = arcpy.GetParameterAsText(1)
     output_layer_name = arcpy.GetParameterAsText(2)
-
-    if not query:
-        query = "Major California Cities"
-    if not output_layer_name:
-        output_layer_name = "assistant_output"
 
     fetch_geojson(api_key, query, output_layer_name)
