@@ -1,53 +1,30 @@
 
-#   enrich existing data with ai
-#       add a column to an existing table with the result of the ai prompt
-#       like existing excel/google sheets plugins
-#       must be able to refer to existing columns in the dataset by name
-#       compelling demo idea:
-#           1. use generate ai feature layer to create "all 50 us state capitals" point feature class
-#           2. use this new tool "Generate AI Field" to add a new column with a fun fact about this city
-
+'''
+The "Generate AI Field" tool is designed to enrich existing GIS feature layers by adding a new field
+containing AI-generated responses. This tool can be used to add informative or fun facts to GIS data,
+such as adding fun facts about US state capitals. The tool leverages OpenAI's API to generate responses
+based on user-defined prompts and can refer to existing columns in the dataset by name.
 
 '''
-given an existing feature layer in arcgis pro, add a column that holds the response from an ai assistant
-
-parameters:
-    in layer
-    out layer
-    field name
-    prompt (with ability to refer to existing fields)
-    sql query (only operate on matching records)
-    
-steps:
-    convert feature layer to dataframe
-    add the new text field
-    parse fields and look for them in the prompt
-    filter the data based on the sql query (if supplied)
-    hit the openai assistant api for each prompt
-    store the result in the new field
-    convert the dataframe back to a feature layer
-
-usage:
-    if the prompt contains no field information, the AI will attempt to infer what you mean based on the geometry information
-
-examples:
-    given a feature class containing a list of US state capital cities and a prompt "a fun fact about this city"
-    the "capital" column is assumed to be the target, so the query that's submitted is "a fun fact about {capital}"
-    does this logic take a separate assistant?
-    a simpler but less robust method might be to cram the whole row into the message, like "6 california sacramento, a fun fact about this city"
-    or even "here is the subject of my query below: "OID: 6 state: california capital: sacramento" \n here is my query: "a fun fact about this city"
-    use system prompt like "Respond in one simple sentence without preamble or extra context."
-
-'''
-
 import arcpy
 import requests
 import time
 import json
 
 def add_ai_response_to_feature_layer(api_key, in_layer, out_layer, field_name, prompt, sql_query=None):
-    
-    arcpy.CopyFeatures_management(in_layer,out_layer)
+    """
+    Enriches an existing feature layer by adding a new field with AI-generated responses.
+
+    Parameters:
+    api_key (str): API key for OpenAI.
+    in_layer (str): Path to the input feature layer.
+    out_layer (str): Path to the output feature layer.
+    field_name (str): Name of the field to add the AI responses.
+    prompt (str): Template for the prompt to be used by AI.
+    sql_query (str, optional): Optional SQL query to filter the features.
+
+    """
+    arcpy.CopyFeatures_management(in_layer, out_layer)
     arcpy.AddMessage(out_layer)
 
     # Add new field for AI responses
@@ -56,8 +33,16 @@ def add_ai_response_to_feature_layer(api_key, in_layer, out_layer, field_name, p
     else:
         arcpy.management.AddField(out_layer, field_name+"_AI", "TEXT")
 
-
     def create_thread(api_key):
+        """
+        Creates a new thread for the AI assistant to maintain context across multiple messages.
+
+        Parameters:
+        api_key (str): API key for OpenAI.
+
+        Returns:
+        str: Thread ID.
+        """
         headers = {
             "Authorization": f"Bearer {api_key}",
             "Content-Type": "application/json",
@@ -74,6 +59,17 @@ def add_ai_response_to_feature_layer(api_key, in_layer, out_layer, field_name, p
         raise Exception(f"Failed to create thread after retries")
 
     def submit_message(api_key, thread_id, user_message):
+        """
+        Submits a message to the AI assistant and initiates a run.
+
+        Parameters:
+        api_key (str): API key for OpenAI.
+        thread_id (str): ID of the thread.
+        user_message (str): Message to be sent to the AI.
+
+        Returns:
+        str: Run ID.
+        """
         headers = {
             "Authorization": f"Bearer {api_key}",
             "Content-Type": "application/json",
@@ -99,6 +95,17 @@ def add_ai_response_to_feature_layer(api_key, in_layer, out_layer, field_name, p
         raise Exception(f"Failed to send message and initiate run after retries")
 
     def wait_on_run(api_key, thread_id, run_id):
+        """
+        Polls the status of the AI run until it is completed.
+
+        Parameters:
+        api_key (str): API key for OpenAI.
+        thread_id (str): ID of the thread.
+        run_id (str): ID of the run.
+
+        Returns:
+        dict: Run status.
+        """
         headers = {
             "Authorization": f"Bearer {api_key}",
             "Content-Type": "application/json",
@@ -126,6 +133,16 @@ def add_ai_response_to_feature_layer(api_key, in_layer, out_layer, field_name, p
                 time.sleep(1)
 
     def get_response(api_key, thread_id):
+        """
+        Retrieves the AI response from the completed run.
+
+        Parameters:
+        api_key (str): API key for OpenAI.
+        thread_id (str): ID of the thread.
+
+        Returns:
+        str: AI response content.
+        """
         headers = {
             "Authorization": f"Bearer {api_key}",
             "Content-Type": "application/json",
@@ -146,7 +163,17 @@ def add_ai_response_to_feature_layer(api_key, in_layer, out_layer, field_name, p
                 time.sleep(1)
         raise Exception(f"Failed to get messages after retries")
     
-    def get_ai_response(api_key,prompt):
+    def get_ai_response(api_key, prompt):
+        """
+        Generates an AI response for a given prompt.
+
+        Parameters:
+        api_key (str): API key for OpenAI.
+        prompt (str): Prompt template to be used by AI.
+
+        Returns:
+        str: AI response.
+        """
         try:
             thread_id = create_thread(api_key)
             run_id = submit_message(api_key, thread_id, prompt)
@@ -163,6 +190,15 @@ def add_ai_response_to_feature_layer(api_key, in_layer, out_layer, field_name, p
         return response[0]
 
     def generate_ai_responses_for_feature_class(api_key, feature_class, field_name, prompt_template):
+        """
+        Generates AI responses for each feature in the feature class and updates the new field with these responses.
+
+        Parameters:
+        api_key (str): API key for OpenAI.
+        feature_class (str): Path to the feature class.
+        field_name (str): Name of the field to add the AI responses.
+        prompt_template (str): Template for the prompt to be used by AI.
+        """
         # Get the OID field name
         desc = arcpy.Describe(feature_class)
         oid_field_name = desc.OIDFieldName
@@ -180,7 +216,7 @@ def add_ai_response_to_feature_layer(api_key, in_layer, out_layer, field_name, p
         prompts_dict = {}
 
         # Use a SearchCursor to iterate over the rows in the feature class and generate prompts
-        with arcpy.da.SearchCursor(feature_class, fields[:-1],sql_query) as cursor:  # Exclude the new field
+        with arcpy.da.SearchCursor(feature_class, fields[:-1], sql_query) as cursor:  # Exclude the new field
             for row in cursor:
                 row_dict = {field: value for field, value in zip(fields[:-1], row)}
                 formatted_prompt = prompt_template.format(**row_dict)
@@ -206,7 +242,7 @@ def add_ai_response_to_feature_layer(api_key, in_layer, out_layer, field_name, p
                     row[1] = responses_dict[oid]
                     cursor.updateRow(row)
     
-    generate_ai_responses_for_feature_class(api_key,out_layer,field_name,prompt)
+    generate_ai_responses_for_feature_class(api_key, out_layer, field_name, prompt)
 
 
 if __name__ == "__main__":
