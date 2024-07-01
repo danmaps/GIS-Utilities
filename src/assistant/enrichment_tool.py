@@ -5,7 +5,9 @@ containing AI-generated responses. This tool can be used to add informative or f
 such as adding fun facts about US state capitals. The tool leverages OpenAI's API to generate responses
 based on user-defined prompts and can refer to existing columns in the dataset by name.
 
-'''import arcpy
+'''
+
+import arcpy
 import requests
 import json
 import time
@@ -110,8 +112,9 @@ def add_ai_response_to_feature_layer(api_key, in_layer, out_layer, field_name, p
             arcpy.AddMessage("prompts_dict is empty.")
 
         # Get AI responses for each prompt
+        role = "You are a helpful assistant. Respond in one simple sentence without preamble or extra context."
         responses_dict = {
-            oid: get_ai_response(api_key, [{"role": "system", "content": "You are a helpful assistant."}, {"role": "user", "content": prompt}])
+            oid: get_ai_response(api_key, [{"role": "system", "content": role}, {"role": "user", "content": prompt}])
             for oid, prompt in prompts_dict.items()
         }
 

@@ -34,101 +34,42 @@
 #       this information is used by the AI as a "style guide" for continued drawing, which it does
 #
 
-
 import requests
 import time
 import arcpy
 import json
 import os
 
-def create_thread(api_key):
+def get_ai_response(api_key, messages):
+    """
+    Generates an AI response for a given set of messages using the chat completions endpoint.
+
+    Parameters:
+    api_key (str): API key for OpenAI.
+    messages (list): List of message dictionaries for the AI chat.
+
+    Returns:
+    str: AI response.
+    """
     headers = {
         "Authorization": f"Bearer {api_key}",
-        "Content-Type": "application/json",
-        "OpenAI-Beta": "assistants=v2"
+        "Content-Type": "application/json"
     }
-    for _ in range(3):
-        try:
-            response = requests.post("https://api.openai.com/v1/threads", headers=headers, json={}, verify=False)
-            response.raise_for_status()
-            return response.json()["id"]
-        except requests.exceptions.RequestException as e:
-            arcpy.AddWarning(f"Retrying thread creation due to: {e}")
-            time.sleep(1)
-    raise Exception(f"Failed to create thread after retries")
-
-def submit_message(api_key, thread_id, user_message):
-    headers = {
-        "Authorization": f"Bearer {api_key}",
-        "Content-Type": "application/json",
-        "OpenAI-Beta": "assistants=v2"
-    }
-
-    message_payload = {
-        "role": "user",
-        "content": user_message
-    }
-    
-    for _ in range(3):
-        try:
-            response = requests.post(f"https://api.openai.com/v1/threads/{thread_id}/messages", headers=headers, json=message_payload, verify=False)
-            response.raise_for_status()
-            run_payload = {"assistant_id": "asst_AEeH9H8dWTl1DGszMInYIhqu"}
-            run_response = requests.post(f"https://api.openai.com/v1/threads/{thread_id}/runs", headers=headers, json=run_payload, verify=False)
-            run_response.raise_for_status()
-            return run_response.json()["id"]
-        except requests.exceptions.RequestException as e:
-            arcpy.AddWarning(f"Retrying message submission due to: {e}")
-            time.sleep(1)
-    raise Exception(f"Failed to send message and initiate run after retries")
-
-def wait_on_run(api_key, thread_id, run_id):
-    headers = {
-        "Authorization": f"Bearer {api_key}",
-        "Content-Type": "application/json",
-        "OpenAI-Beta": "assistants=v2"
-    }
-    
-    run_status_url = f"https://api.openai.com/v1/threads/{thread_id}/runs/{run_id}"
-    
-    while True:
-        try:
-            response = requests.get(run_status_url, headers=headers, verify=False)
-            response.raise_for_status()
-            if not response.content:
-                raise Exception("Empty response received while checking run status.")
-            run_status = response.json()
-            status = run_status.get("status")
-            if status == "completed":
-                return run_status
-            elif status in ["queued", "in_progress"]:
-                time.sleep(0.5)
-            else:
-                raise Exception(f"Run failed with status: {status}")
-        except requests.exceptions.RequestException as e:
-            arcpy.AddWarning(f"Retrying run status check due to: {e}")
-            time.sleep(1)
-
-def get_response(api_key, thread_id):
-    headers = {
-        "Authorization": f"Bearer {api_key}",
-        "Content-Type": "application/json",
-        "OpenAI-Beta": "assistants=v2"
+    data = {
+        "model": "gpt-4o",
+        "response_format": { "type": "json_object" },
+        "messages": messages
     }
 
     for _ in range(3):
         try:
-            response = requests.get(f"https://api.openai.com/v1/threads/{thread_id}/messages", headers=headers, verify=False)
+            response = requests.post("https://api.openai.com/v1/chat/completions", headers=headers, json=data, verify=False)
             response.raise_for_status()
-            if not response.content:
-                raise Exception("Empty response received while retrieving messages.")
-            messages = response.json()
-            content = [msg['content'][0]['text']['value'] for msg in messages.get('data', []) if msg['role'] == 'assistant']
-            return content
+            return response.json()["choices"][0]["message"]["content"].strip()
         except requests.exceptions.RequestException as e:
-            arcpy.AddWarning(f"Retrying message retrieval due to: {e}")
+            arcpy.AddWarning(f"Retrying AI response generation due to: {e}")
             time.sleep(1)
-    raise Exception(f"Failed to get messages after retries")
+    raise Exception("Failed to get AI response after retries")
 
 def infer_geometry_type(geojson_data):
     geometry_type_map = {
@@ -152,22 +93,24 @@ def infer_geometry_type(geojson_data):
         raise ValueError("Multiple geometry types found in GeoJSON")
 
 def fetch_geojson(api_key, query, output_layer_name):
+    messages = [
+        {"role": "system", "content": "You are a helpful assistant that always only returns valid GeoJSON in response to user queries. Don't use too many vertices. Include somewhat detailed geometry and any attributes you think might be relevant. Include factual information. If you want to communicate text to the user, you may use a message property in the attributes of geometry objects. For compatibility with ArcGIS Pro, avoid multiple geometry types in the GeoJSON output. For example, don't mix points and polygons."},
+        {"role": "user", "content": query}
+    ]
+
     try:
-        thread_id = create_thread(api_key)
-        run_id = submit_message(api_key, thread_id, query)
-        run_status = wait_on_run(api_key, thread_id, run_id)
-        geojson_data = get_response(api_key, thread_id)
+        geojson_data = get_ai_response(api_key, messages)
 
         # Add debugging to inspect the raw GeoJSON response
-        arcpy.AddMessage(f"Raw GeoJSON data: {geojson_data[0]}")
+        arcpy.AddMessage(f"Raw GeoJSON data: {geojson_data}")
 
-        geojson_data = json.loads(geojson_data[0])  # Assuming single response for simplicity
+        geojson_data = json.loads(geojson_data)  # Assuming single response for simplicity
         geometry_type = infer_geometry_type(geojson_data)
     except Exception as e:
         arcpy.AddError(str(e))
         return
 
-    geojson_file = os.path.join("geojson_output",f"{output_layer_name}.geojson")
+    geojson_file = os.path.join("geojson_output", f"{output_layer_name}.geojson")
     with open(geojson_file, 'w') as f:
         json.dump(geojson_data, f)
 
