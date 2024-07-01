@@ -55,7 +55,7 @@ def add_ai_response_to_feature_layer(api_key, in_layer, out_layer, field_name, p
             "Content-Type": "application/json"
         }
         data = {
-            "model": "gpt-4",
+            "model": "gpt-4o",
             "messages": messages
         }
 

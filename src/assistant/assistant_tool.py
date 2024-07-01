@@ -1,5 +1,4 @@
 # todo:
-#   add dynamic assistant creation step (this allows me to open source the whole project and instruct others on how to use it)
 #   record a compelling demo
 #   handle too-large geojson output gracefully instead of a cryptic error message
 
@@ -57,7 +56,7 @@ def get_ai_response(api_key, messages):
     }
     data = {
         "model": "gpt-4o",
-        "response_format": { "type": "json_object" },
+        "response_format": { "type": "json_object" }, # this is very important
         "messages": messages
     }
 
@@ -72,6 +71,18 @@ def get_ai_response(api_key, messages):
     raise Exception("Failed to get AI response after retries")
 
 def infer_geometry_type(geojson_data):
+    """
+    Infers the geometry type from GeoJSON data.
+
+    Parameters:
+    geojson_data (dict): GeoJSON data as a dictionary.
+
+    Returns:
+    str: Geometry type compatible with ArcGIS Pro.
+
+    Raises:
+    ValueError: If multiple geometry types are found in the GeoJSON data.
+    """
     geometry_type_map = {
         "Point": "Point",
         "MultiPoint": "Multipoint",
@@ -91,8 +102,38 @@ def infer_geometry_type(geojson_data):
         return geometry_types.pop()
     else:
         raise ValueError("Multiple geometry types found in GeoJSON")
+    
+def expand_extent(extent, factor=1.1):
+    """
+    Expands the given extent by the specified factor.
+
+    Parameters:
+    extent (arcpy.Extent): The extent to be expanded.
+    factor (float): The factor by which to expand the extent.
+
+    Returns:
+    arcpy.Extent: The expanded extent.
+    """
+    width = extent.XMax - extent.XMin
+    height = extent.YMax - extent.YMin
+    expanded_extent = arcpy.Extent(
+        extent.XMin - width * (factor - 1) / 2,
+        extent.YMin - height * (factor - 1) / 2,
+        extent.XMax + width * (factor - 1) / 2,
+        extent.YMax + height * (factor - 1) / 2
+    )
+    return expanded_extent
+
 
 def fetch_geojson(api_key, query, output_layer_name):
+    """
+    Fetches GeoJSON data using an AI response and creates a feature layer in ArcGIS Pro.
+
+    Parameters:
+    api_key (str): API key for OpenAI.
+    query (str): User query for the AI to generate GeoJSON data.
+    output_layer_name (str): Name of the output layer to be created in ArcGIS Pro.
+    """
     messages = [
         {"role": "system", "content": "You are a helpful assistant that always only returns valid GeoJSON in response to user queries. Don't use too many vertices. Include somewhat detailed geometry and any attributes you think might be relevant. Include factual information. If you want to communicate text to the user, you may use a message property in the attributes of geometry objects. For compatibility with ArcGIS Pro, avoid multiple geometry types in the GeoJSON output. For example, don't mix points and polygons."},
         {"role": "user", "content": query}
@@ -115,7 +156,7 @@ def fetch_geojson(api_key, query, output_layer_name):
         json.dump(geojson_data, f)
 
     arcpy.conversion.JSONToFeatures(geojson_file, output_layer_name, geometry_type=geometry_type)
-
+    
     aprx = arcpy.mp.ArcGISProject("CURRENT")
     if aprx.activeMap:
         active_map = aprx.activeMap
@@ -125,16 +166,21 @@ def fetch_geojson(api_key, query, output_layer_name):
         try:
             active_map.addDataFromPath(output_layer_path)
             layer = active_map.listLayers(output_layer_name)[0]
-            
-            # Get the active view
-            active_view = aprx.activeView
-            
-            #if isinstance(active_view, arcpy.mp.MapView):
-            # Get the extent using getLayerExtent
-            extent = active_view.getLayerExtent(layer)
+
+            # Get the data source and its extent
+            desc = arcpy.Describe(layer.dataSource)
+            extent = desc.extent
+
             if extent:
-                active_view.camera.setExtent(extent)
-                arcpy.AddMessage(f"Layer '{output_layer_name}' added and extent set successfully.")
+                expanded_extent = expand_extent(extent)
+                active_view = aprx.activeView
+
+                # Check if the active view is a map view
+                if hasattr(active_view, 'camera'):
+                    active_view.camera.setExtent(expanded_extent)
+                    arcpy.AddMessage(f"Layer '{output_layer_name}' added and extent set successfully.")
+                else:
+                    arcpy.AddWarning("The active view is not a map view, unable to set the extent.")
             else:
                 arcpy.AddWarning(f"Unable to get extent for layer '{output_layer_name}'.")
 
