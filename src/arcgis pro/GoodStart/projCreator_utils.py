@@ -14,9 +14,9 @@ def validate_project_name(project_name):
 
 def create_folder_structure(base_path, template_path, project_name):
     if base_path.endswith("2024Proj"):
-        project_folder = os.path.join(base_path, f"{datetime.now().strftime('%Y')}_{project_name}")
+        project_folder = os.path.join(base_path, f"{datetime.datetime.now().strftime('%Y')}_{project_name}")
     elif base_path.endswith("Data_Requests"):
-        project_folder = os.path.join(base_path, f"{datetime.now().strftime('%Y%m%d')}_{project_name}")
+        project_folder = os.path.join(base_path, f"{datetime.datetime.now().strftime('%Y%m%d')}_{project_name}")
     else:
         project_folder = os.path.join(base_path, project_name)
 
