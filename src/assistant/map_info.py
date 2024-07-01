@@ -1,60 +1,112 @@
+'''
+This script gathers detailed information about the active map in an ArcGIS Pro project and exports it to a JSON file. It collects:
+
+- **Map Information**:
+  - Name
+  - Title
+  - Description
+  - Spatial Reference
+  - Rotation
+  - Units
+  - Time-enabled Status
+  - Metadata
+
+- **Layer Information** (for each feature layer):
+  - Name
+  - Data Type
+  - Visibility
+  - Spatial Reference
+  - Extent
+  - Source Type
+  - Geometry Type
+  - Renderer
+  - Labeling Status
+
+- **Field Information** (for each layer):
+  - Name
+  - Type
+  - Length
+
+- **Record Count** (for each layer)
+
+This comprehensive dataset provides an in-depth overview of the map's structure and contents, suitable for further analysis and integration with other systems.
+
+
+'''
+
 import arcpy
 import json
 
-def map_to_json(mapx_file_path, output_json_path):
-    # Load the .mapx file
-    aprx = arcpy.mp.ArcGISProject(mapx_file_path)
-    mapx_info = {}
 
-    # Iterate through all maps in the project
-    for map in aprx.listMaps():
-        map_info = {
-            "map_name": map.name,
-            "spatial_reference": map.spatialReference.name,
-            "layers": []
+def map_to_json(output_json_path):
+    # Get the current project and active map
+    aprx = arcpy.mp.ArcGISProject("CURRENT")
+    active_map = aprx.activeMap
+    
+    if not active_map:
+        raise ValueError("No active map found in the current project.")
+    
+    # Collect map information
+    map_info = {
+        "map_name": active_map.name,
+        "title": active_map.title if hasattr(active_map, 'title') else "No title",
+        "description": active_map.description if hasattr(active_map, 'description') else "No description",
+        "spatial_reference": active_map.spatialReference.name,
+        "layers": [],
+        "properties": {
+            "rotation": active_map.rotation if hasattr(active_map, 'rotation') else "No rotation",
+            "units": active_map.units if hasattr(active_map, 'units') else "No units",
+            "time_enabled": active_map.isTimeEnabled if hasattr(active_map, 'isTimeEnabled') else "No time enabled",
+            "metadata": active_map.metadata if hasattr(active_map, 'metadata') else "No metadata",
         }
-        
-        for layer in map.listLayers():
-            if layer.isFeatureLayer:
-                layer_info = {
-                    "name": layer.name,
-                    "type": layer.type,
-                    "visible": layer.visible,
-                    "spatial_reference": layer.spatialReference.name if layer.spatialReference else "Unknown",
-                    "extent": {
-                        "xmin": layer.getExtent().XMin,
-                        "ymin": layer.getExtent().YMin,
-                        "xmax": layer.getExtent().XMax,
-                        "ymax": layer.getExtent().YMax
-                    } if layer.getExtent() else "Unknown",
-                    "fields": [],
-                    "record_count": 0
-                }
-                
-                # Get fields information
-                fields = arcpy.ListFields(layer.dataSource)
-                for field in fields:
+    }
+
+    # Iterate through layers and collect information
+    for layer in active_map.listLayers():
+        if layer.isFeatureLayer:
+            dataset = arcpy.Describe(layer.dataSource)
+            
+            layer_info = {
+                "name": layer.name,
+                "data_type": dataset.dataType,
+                "visible": layer.visible,
+                "spatial_reference": dataset.spatialReference.name if hasattr(dataset, "spatialReference") else "Unknown",
+                "extent": {
+                    "xmin": dataset.extent.XMin,
+                    "ymin": dataset.extent.YMin,
+                    "xmax": dataset.extent.XMax,
+                    "ymax": dataset.extent.YMax
+                } if hasattr(dataset, "extent") else "Unknown",
+                "fields": [],
+                "record_count": 0,
+                "source_type": dataset.dataType if hasattr(dataset, "dataType") else "Unknown",
+                "geometry_type": dataset.shapeType if hasattr(dataset, "shapeType") else "Unknown",
+                "renderer": layer.symbology.renderer.type if hasattr(layer, "symbology") and hasattr(layer.symbology, "renderer") else "Unknown",
+                "labeling": layer.showLabels if hasattr(layer, "showLabels") else "Unknown"
+            }
+            
+            # Get fields information
+            if hasattr(dataset, "fields"):
+                for field in dataset.fields:
                     field_info = {
                         "name": field.name,
                         "type": field.type,
                         "length": field.length
                     }
                     layer_info["fields"].append(field_info)
-                
-                # Get record count
-                layer_info["record_count"] = arcpy.management.GetCount(layer.dataSource)[0]
-                
-                map_info["layers"].append(layer_info)
-
-        mapx_info[map.name] = map_info
+            
+            # Get record count if the layer has records
+            if dataset.dataType in ["FeatureClass", "Table"]:
+                layer_info["record_count"] = int(arcpy.management.GetCount(layer.dataSource)[0])
+            
+            map_info["layers"].append(layer_info)
 
     # Write the map information to a JSON file
     with open(output_json_path, 'w') as json_file:
-        json.dump(mapx_info, json_file, indent=4)
+        json.dump(map_info, json_file, indent=4)
 
     print(f"Map information has been written to {output_json_path}")
 
 # Example usage
-mapx_file_path = '/mnt/data/California Coastline.mapx'
-output_json_path = 'map_info.json'
-map_to_json(mapx_file_path, output_json_path)
+output_json_path = r"C:\Users\mcveydb\Projects\assistant\map_info.json"
+map_to_json(output_json_path)
