@@ -4,7 +4,7 @@ import arcpy
 import json
 
 description_PROMPT = '''
-I have a JSON containing detailed information about a map in ArcGIS Pro. The JSON includes the following details:
+I have a map in ArcGIS Pro. I've gathered information about this map and will give it to you in the following JSON format with the following details:
 
 - **Map Information**:
   - Map Name
@@ -38,7 +38,7 @@ Feel free to omit details if the information is missing from the JSON.
 '''
 
 question_PROMPT = '''
-I have a JSON containing detailed information about a map in ArcGIS Pro. The JSON includes the following details:
+I have a map in ArcGIS Pro. I've gathered information about this map and will give it to you in the following JSON format with the following details:
 
 - **Map Information**:
   - Map Name
@@ -66,7 +66,7 @@ I have a JSON containing detailed information about a map in ArcGIS Pro. The JSO
 
 - **Record Count** (for each layer)
 
-Based on this information, please answer the users's questions.
+Based on this information, please answer the users's questions. Remember that the map is open in ArcGIS Pro, so in that context, the user can run geoprocessing tools, use the attribute table, and do anything else that ArcGIS Pro is designed for.
 '''
 
 def map_to_json(in_map=None, output_json_path=None):
