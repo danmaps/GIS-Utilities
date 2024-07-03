@@ -4,7 +4,7 @@ import arcpy
 import json
 
 PROMPT = '''
-I have a JSON file containing detailed information about a map. The JSON includes the following details:
+I have a JSON containing detailed information about a map in ArcGIS Pro. The JSON includes the following details:
 
 - **Map Information**:
   - Map Name
@@ -13,7 +13,7 @@ I have a JSON file containing detailed information about a map. The JSON include
   - Spatial Reference
   - Properties (Rotation, Units, Time Enabled, Metadata)
 
-- **Layer Information** (for each layer):
+- **Layer Information** (for feature layers):
   - Name
   - Data Type
   - Visibility
@@ -61,17 +61,13 @@ def map_to_json(in_map=None, output_json_path=None):
             "extent": extent_dict
         }
         return meta_dict
-    
 
     aprx = arcpy.mp.ArcGISProject("CURRENT")    
     if not in_map:
-           
         active_map = aprx.activeMap
         if not active_map:
             raise ValueError("No active map found in the current project.")
-        
     else:
-        arcpy.AddMessage(in_map)
         active_map = aprx.listMaps(in_map)[0]
         
     # Collect map information
@@ -91,13 +87,18 @@ def map_to_json(in_map=None, output_json_path=None):
 
     # Iterate through layers and collect information
     for layer in active_map.listLayers():
+        layer_info = {
+            "name": layer.name,
+            "feature_layer": layer.isFeatureLayer,
+            "raster_layer": layer.isRasterLayer,
+            "web_layer": layer.isWebLayer,
+            "visible": layer.visible,
+            "metadata": metadata_to_dict(layer.metadata) if hasattr(layer, 'metadata') else "No metadata"
+        }
+
         if layer.isFeatureLayer:
             dataset = arcpy.Describe(layer.dataSource)
-            
-            layer_info = {
-                "name": layer.name,
-                "data_type": dataset.dataType,
-                "visible": layer.visible,
+            layer_info.update({
                 "spatial_reference": dataset.spatialReference.name if hasattr(dataset, "spatialReference") else "Unknown",
                 "extent": {
                     "xmin": dataset.extent.XMin,
@@ -111,8 +112,7 @@ def map_to_json(in_map=None, output_json_path=None):
                 "geometry_type": dataset.shapeType if hasattr(dataset, "shapeType") else "Unknown",
                 "renderer": layer.symbology.renderer.type if hasattr(layer, "symbology") and hasattr(layer.symbology, "renderer") else "Unknown",
                 "labeling": layer.showLabels if hasattr(layer, "showLabels") else "Unknown",
-                "metadata": metadata_to_dict(layer.metadata) if hasattr(layer, 'metadata') else "No metadata"
-            }
+            })
             
             # Get fields information
             if hasattr(dataset, "fields"):
@@ -127,8 +127,8 @@ def map_to_json(in_map=None, output_json_path=None):
             # Get record count if the layer has records
             if dataset.dataType in ["FeatureClass", "Table"]:
                 layer_info["record_count"] = int(arcpy.management.GetCount(layer.dataSource)[0])
-            
-            map_info["layers"].append(layer_info)
+
+        map_info["layers"].append(layer_info)
 
     if output_json_path:
         # Write the map information to a JSON file
@@ -155,7 +155,7 @@ def get_ai_response(api_key, messages):
         "Content-Type": "application/json"
     }
     data = {
-        "model": "gpt-4o",
+        "model": "gpt-4",
         "messages": messages
     }
 
@@ -168,7 +168,6 @@ def get_ai_response(api_key, messages):
             arcpy.AddWarning(f"Retrying AI response generation due to: {e}")
             time.sleep(1)
     raise Exception("Failed to get AI response after retries")
-
 
 def generate_insights(api_key, json_data):
     messages = [
