@@ -3,7 +3,7 @@ import time
 import arcpy
 import json
 
-PROMPT = '''
+description_PROMPT = '''
 I have a JSON containing detailed information about a map in ArcGIS Pro. The JSON includes the following details:
 
 - **Map Information**:
@@ -35,6 +35,38 @@ I have a JSON containing detailed information about a map in ArcGIS Pro. The JSO
 Based on this information, please provide a comprehensive description of the map, including its purpose, the significance of its layers, and any notable features or insights. Also, suggest potential analyses or visualizations that could be performed using this map data.
 
 Feel free to omit details if the information is missing from the JSON.
+'''
+
+question_PROMPT = '''
+I have a JSON containing detailed information about a map in ArcGIS Pro. The JSON includes the following details:
+
+- **Map Information**:
+  - Map Name
+  - Title
+  - Description
+  - Spatial Reference
+  - Properties (Rotation, Units, Time Enabled, Metadata)
+
+- **Layer Information** (for feature layers):
+  - Name
+  - Data Type
+  - Visibility
+  - Spatial Reference
+  - Extent (xmin, ymin, xmax, ymax)
+  - Source Type
+  - Geometry Type
+  - Renderer
+  - Labeling Status
+  - Metadata (Title, Tags, Summary, Description, Credits, Access Constraints, Extent)
+
+- **Field Information** (for each layer):
+  - Field Name
+  - Field Type
+  - Field Length
+
+- **Record Count** (for each layer)
+
+Based on this information, please answer the users's questions.
 '''
 
 def map_to_json(in_map=None, output_json_path=None):
@@ -155,7 +187,7 @@ def get_ai_response(api_key, messages):
         "Content-Type": "application/json"
     }
     data = {
-        "model": "gpt-4",
+        "model": "gpt-4o",
         "messages": messages
     }
 
@@ -169,11 +201,18 @@ def get_ai_response(api_key, messages):
             time.sleep(1)
     raise Exception("Failed to get AI response after retries")
 
-def generate_insights(api_key, json_data):
-    messages = [
-        {"role": "system", "content": PROMPT},
-        {"role": "user", "content": json.dumps(json_data, indent=4)}
-    ]
+def generate_insights(api_key, json_data, question=None):
+    if question:
+        messages = [
+            {"role": "system", "content": question_PROMPT},
+            {"role": "system", "content": json.dumps(json_data, indent=4)},
+            {"role": "user", "content": question}
+        ]
+    else:
+        messages = [
+            {"role": "system", "content": description_PROMPT},
+            {"role": "user", "content": json.dumps(json_data, indent=4)}
+        ]
 
     try:
         insights = get_ai_response(api_key, messages)
@@ -187,6 +226,7 @@ def generate_insights(api_key, json_data):
 if __name__ == "__main__":
     api_key = arcpy.GetParameterAsText(0)
     selected_map = arcpy.GetParameterAsText(1)
+    question = arcpy.GetParameterAsText(2)
     
     if selected_map:
         map_info = map_to_json(selected_map)
@@ -194,4 +234,4 @@ if __name__ == "__main__":
         map_info = map_to_json() # current active view
     
     # Generate insights based on the JSON data
-    generate_insights(api_key, map_info)
+    generate_insights(api_key, map_info, question)
