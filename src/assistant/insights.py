@@ -4,92 +4,138 @@ import arcpy
 import json
 
 description_PROMPT = '''
-I have a map in ArcGIS Pro. I've gathered information about this map and will give it to you in the following JSON format with the following details:
-
-- **Map Information**:
-  - Map Name
-  - Title
-  - Description
-  - Spatial Reference
-  - Properties (Rotation, Units, Time Enabled, Metadata)
-
-- **Layer Information** (for feature layers):
-  - Name
-  - Data Type
-  - Visibility
-  - Spatial Reference
-  - Extent (xmin, ymin, xmax, ymax)
-  - Source Type
-  - Geometry Type
-  - Renderer
-  - Labeling Status
-  - Metadata (Title, Tags, Summary, Description, Credits, Access Constraints, Extent)
-
-- **Field Information** (for each layer):
-  - Field Name
-  - Field Type
-  - Field Length
-
-- **Record Count** (for each layer)
+I have a map in ArcGIS Pro. I've gathered information about this map and will give it to you in JSON format containing information about the map, including the map name, title, description, spatial reference, layers, and properties.
 
 Based on this information, please provide a comprehensive description of the map, including its purpose, the significance of its layers, and any notable features or insights. Also, suggest potential analyses or visualizations that could be performed using this map data.
 
-Feel free to omit details if the information is missing from the JSON.
+Feel free to omit details if the information is missing from the JSON. Please respond only with HTML formatted text appropriate for inside the <body> tags of an HTML document.
 '''
 
 question_PROMPT = '''
-I have a map in ArcGIS Pro. I've gathered information about this map and will give it to you in the following JSON format with the following details:
+I have a map in ArcGIS Pro. I've gathered information about this map and will give it to you in JSON format containing information about the map, including the map name, title, description, spatial reference, layers, and properties.
 
-- **Map Information**:
-  - Map Name
-  - Title
-  - Description
-  - Spatial Reference
-  - Properties (Rotation, Units, Time Enabled, Metadata)
-
-- **Layer Information** (for feature layers):
-  - Name
-  - Data Type
-  - Visibility
-  - Spatial Reference
-  - Extent (xmin, ymin, xmax, ymax)
-  - Source Type
-  - Geometry Type
-  - Renderer
-  - Labeling Status
-  - Metadata (Title, Tags, Summary, Description, Credits, Access Constraints, Extent)
-
-- **Field Information** (for each layer):
-  - Field Name
-  - Field Type
-  - Field Length
-
-- **Record Count** (for each layer)
-
-Based on this information, please answer the users's questions. Remember that the map is open in ArcGIS Pro, so in that context, the user can run geoprocessing tools, use the attribute table, and do anything else that ArcGIS Pro is designed for.
+Based on this information, please answer the users's questions. Remember that the map is open in ArcGIS Pro, so in that context, the user can run geoprocessing tools, use the attribute table, and do anything else that ArcGIS Pro is designed for. 
 '''
 
 def map_to_json(in_map=None, output_json_path=None):
+    """
+    Generates a JSON object containing information about a map.
 
+    Args:
+        in_map (str, optional): The name of the map to get information from. If not provided, the active map in the current project will be used. Defaults to None.
+        output_json_path (str, optional): The path to the JSON file where the map information will be saved. If not provided, the map information will not be saved. Defaults to None.
+
+    Returns:
+        dict: A dictionary containing information about the map, including the map name, title, description, spatial reference, layers, and properties.
+
+    Raises:
+        ValueError: If no active map is found in the current project.
+
+    Notes:
+        - The function uses the `arcpy` module to interact with the ArcGIS Pro application.
+        - The function collects information about the active map, including the map name, title, description, spatial reference, and layers.
+        - For each layer, the function collects information such as the layer name, feature layer status, raster layer status, web layer status, visibility, metadata, spatial reference, extent, fields, record count, source type, geometry type, renderer, and labeling.
+        - If `output_json_path` is provided, the map information will be saved to a JSON file at the specified path.
+
+    Example:
+        >>> map_info = map_to_json()
+        >>> print(map_info)
+        {
+            "map_name": "MyMap",
+            "title": "My Map",
+            "description": "This is my map.",
+            "spatial_reference": "WGS84",
+            "layers": [
+                {
+                    "name": "MyLayer",
+                    "feature_layer": True,
+                    "raster_layer": False,
+                    "web_layer": False,
+                    "visible": True,
+                    "metadata": {
+                        "title": "My Layer",
+                        "tags": ["Tag1", "Tag2"],
+                        "summary": "This is my layer.",
+                        "description": "This is a description of my layer.",
+                        "credits": "Credits for the layer.",
+                        "access_constraints": "Access constraints for the layer.",
+                        "extent": {
+                            "xmin": -180,
+                            "ymin": -90,
+                            "xmax": 180,
+                            "ymax": 90
+                        }
+                    },
+                    "spatial_reference": "WGS84",
+                    "extent": {
+                        "xmin": -180,
+                        "ymin": -90,
+                        "xmax": 180,
+                        "ymax": 90
+                    },
+                    "fields": [
+                        {
+                            "name": "ID",
+                            "type": "Integer",
+                            "length": 10
+                        },
+                        {
+                            "name": "Name",
+                            "type": "String",
+                            "length": 50
+                        }
+                    ],
+                    "record_count": 100,
+                    "source_type": "FeatureClass",
+                    "geometry_type": "Point",
+                    "renderer": "SimpleRenderer",
+                    "labeling": True
+                }
+            ],
+            "properties": {
+                "rotation": 0,
+                "units": "DecimalDegrees",
+                "time_enabled": False,
+                "metadata": {
+                    "title": "My Map",
+                    "tags": ["Tag1", "Tag2"],
+                    "summary": "This is my map.",
+                    "description": "This is a description of my map.",
+                    "credits": "Credits for the map.",
+                    "access_constraints": "Access constraints for the map.",
+                    "extent": {
+                        "xmin": -180,
+                        "ymin": -90,
+                        "xmax": 180,
+                        "ymax": 90
+                    }
+                }
+            }
+        }
+    """
+	
     # Function to convert metadata to a dictionary
     def metadata_to_dict(metadata):
         if metadata is None:
             return "No metadata"
         
-        extent_dict = {
-            "xmax": metadata.XMax if hasattr(metadata, "XMax") else "No extent",
-            "xmin": metadata.XMin if hasattr(metadata, "XMin") else "No extent",
-            "ymax": metadata.YMax if hasattr(metadata, "YMax") else "No extent",
-            "ymin": metadata.YMin if hasattr(metadata, "YMin") else "No extent"
-        }
+        extent_dict = {}
+        if hasattr(metadata, "XMax"):
+            extent_dict["xmax"] = metadata.XMax
+        if hasattr(metadata, "XMin"):
+            extent_dict["xmin"] = metadata.XMin
+        if hasattr(metadata, "YMax"):
+            extent_dict["ymax"] = metadata.YMax
+        if hasattr(metadata, "YMin"):
+            extent_dict["ymin"] = metadata.YMin
         
         meta_dict = {
-            "title": metadata.title,
-            "tags": metadata.tags,
-            "summary": metadata.summary,
-            "description": metadata.description,
-            "credits": metadata.credits,
-            "access_constraints": metadata.accessConstraints,
+            "title": metadata.title if hasattr(metadata, "title") else "No title",
+            "tags": metadata.tags if hasattr(metadata, "tags") else "No tags",
+            "summary": metadata.summary if hasattr(metadata, "summary") else "No summary",
+            "description": metadata.description if hasattr(metadata, "description") else "No description",
+            "credits": metadata.credits if hasattr(metadata, "credits") else "No credits",
+            "access_constraints": metadata.accessConstraints if hasattr(metadata, "accessConstraints") else "No access constraints",
             "extent": extent_dict
         }
         return meta_dict
@@ -202,13 +248,24 @@ def get_ai_response(api_key, messages):
     raise Exception("Failed to get AI response after retries")
 
 def generate_insights(api_key, json_data, question=None):
+    """
+    Generate insights using AI response for a given API key, JSON data, and an optional question.
+
+    Parameters:
+    api_key (str): API key for OpenAI.
+    json_data (dict): JSON data containing information.
+    question (str, optional): A question related to the JSON data. Defaults to None.
+
+    Returns:
+    str: AI-generated insights.
+    """
     if question:
         messages = [
             {"role": "system", "content": question_PROMPT},
             {"role": "system", "content": json.dumps(json_data, indent=4)},
-            {"role": "user", "content": question}
+            {"role": "user", "content": f"{question} Please respond only with HTML formatted text appropriate for inside the <body> tags of an HTML document."}
         ]
-    else:
+    else: # just give a general description
         messages = [
             {"role": "system", "content": description_PROMPT},
             {"role": "user", "content": json.dumps(json_data, indent=4)}
@@ -232,6 +289,8 @@ if __name__ == "__main__":
         map_info = map_to_json(selected_map)
     else:
         map_info = map_to_json() # current active view
+
+    if question:
+        question = question.strip() # remove leading/trailing whitespace
     
-    # Generate insights based on the JSON data
     generate_insights(api_key, map_info, question)
