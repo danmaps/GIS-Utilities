@@ -46,6 +46,7 @@ attribute_query = "shape_area = (SELECT MAX(shape_area) FROM states)"
 # Get the current project and the active view
 aprx = arcpy.mp.ArcGISProject("CURRENT")
 active_map = aprx.activeMap
+active_view = aprx.activeView
 
 # Get the layer
 layer = active_map.listLayers(layer_name)[0]
@@ -53,11 +54,8 @@ layer = active_map.listLayers(layer_name)[0]
 # Select features based on the attribute query
 arcpy.management.SelectLayerByAttribute(layer, "NEW_SELECTION", attribute_query)
 
-# Zoom to the selected features
-active_map.defaultView.zoomToSelectedFeatures()
-
-# Refresh the view
-arcpy.RefreshActiveView()
+# Zoom to the extent of the selected features
+active_view.camera.setExtent(active_view.getLayerExtent(layer))
 '''
 
 def map_to_json(in_map=None, output_json_path=None):
@@ -277,7 +275,9 @@ def get_ai_response(api_key, messages):
     }
     data = {
         "model": "gpt-4o",
-        "messages": messages
+        "messages": messages,
+        "temperature": 0.5, # be more predictable, less creative
+        "max_tokens": 500,
     }
 
     for _ in range(3):
@@ -323,8 +323,8 @@ def generate_python(api_key, json_data, prompt):
         
         # trim response and show to user through message
         code_snippet = trim_code_block(code_snippet)
-        arcpy.addMessage(code_snippet)
-        
+        arcpy.AddMessage(code_snippet)
+
         # execute the code
         exec(code_snippet)
     except Exception as e:
