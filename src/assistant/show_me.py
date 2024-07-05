@@ -1,20 +1,63 @@
+# show_me.py
+
+# takes a natural language prompt, interprets it, and generates Python code to make a selection and change the map extent
+
 import requests
 import time
 import arcpy
 import json
 
-description_PROMPT = '''
+
+python_PROMPT = '''
 I have a map in ArcGIS Pro. I've gathered information about this map and will give it to you in JSON format containing information about the map, including the map name, title, description, spatial reference, layers, and properties.
 
-Based on this information, please provide a comprehensive description of the map, including its purpose, the significance of its layers, and any notable features or insights. Also, suggest potential analyses or visualizations that could be performed using this map data.
+Based on this information, Write Python code that performs the following tasks in ArcGIS Pro:
 
-Feel free to omit details if the information is missing from the JSON. Please respond only with HTML formatted text appropriate for inside the <body> tags of an HTML document.
+Selects features from a specified layer based on a given attribute query.
+Zooms the map extent to the selected features.
+Assume the following inputs:
+
+- user prompt: "show me top 5 points by ID in MyLayer"
+
+You will need to write a SQL query to select features based on an attribute. 
+
+The code should:
+
+- Use the arcpy module.
+- Select the features using arcpy.SelectLayerByAttribute_management.
+- Zoom the map to the selected features using the arcpy.mapping module.
+
+Please provide the only the complete Python code with these requirements.
 '''
 
-question_PROMPT = '''
-I have a map in ArcGIS Pro. I've gathered information about this map and will give it to you in JSON format containing information about the map, including the map name, title, description, spatial reference, layers, and properties.
+example_PROMPT = '''
+show me the largest polygon in states
+'''
 
-Based on this information, please answer the users's questions. Remember that the map is open in ArcGIS Pro, so in that context, the user can run geoprocessing tools, use the attribute table, and do anything else that ArcGIS Pro is designed for. 
+example_PYTHON = '''
+import arcpy
+
+# User prompt: "show me the largest polygon in states"
+
+# Inputs
+layer_name = "states"
+attribute_query = "shape_area = (SELECT MAX(shape_area) FROM states)"
+
+# Get the current project and the active view
+aprx = arcpy.mp.ArcGISProject("CURRENT")
+active_map = aprx.activeMap
+
+# Get the layer
+layer = active_map.listLayers(layer_name)[0]
+
+# Select features based on the attribute query
+arcpy.management.SelectLayerByAttribute(layer, "NEW_SELECTION", attribute_query)
+
+# Zoom to the selected features
+active_map.defaultView.zoomToSelectedFeatures()
+
+# Refresh the view
+arcpy.RefreshActiveView()
 '''
 
 def map_to_json(in_map=None, output_json_path=None):
@@ -247,50 +290,60 @@ def get_ai_response(api_key, messages):
             time.sleep(1)
     raise Exception("Failed to get AI response after retries")
 
-def generate_insights(api_key, json_data, question=None):
+def generate_python(api_key, json_data, prompt):
     """
-    Generate insights using AI response for a given API key, JSON data, and an optional question.
+    Generate python using AI response for a given API key, JSON data, and a question.
 
     Parameters:
     api_key (str): API key for OpenAI.
     json_data (dict): JSON data containing map information.
-    question (str, optional): A question related to the JSON data. Defaults to None.
+    prompt (str): A prompt for the AI referring to a certain selection in the map.
 
     Returns:
     str: AI-generated insights.
     """
-    if question:
+    if prompt:
         messages = [
-            {"role": "system", "content": question_PROMPT},
+            {"role": "system", "content": python_PROMPT},
+            {"role": "user", "content": f"{example_PROMPT}"},
+            {"role": "assistant", "content": f"{example_PYTHON}"},
             {"role": "system", "content": json.dumps(json_data, indent=4)},
-            {"role": "user", "content": f"{question} Please respond only with HTML formatted text appropriate for inside the <body> tags of an HTML document."}
-        ]
-    else: # just give a general description
-        messages = [
-            {"role": "system", "content": description_PROMPT},
-            {"role": "user", "content": json.dumps(json_data, indent=4)}
+            {"role": "user", "content": f"{prompt}"}
         ]
 
     try:
-        insights = get_ai_response(api_key, messages)
-        arcpy.AddMessage(insights)
+        code_snippet = get_ai_response(api_key, messages)
+        def trim_code_block(code_block):
+            # Remove the ```python from the beginning and ``` from the end
+            if code_block.startswith("```python"):
+                code_block = code_block[len("```python"):].strip()
+            if code_block.endswith("```"):
+                code_block = code_block[:-len("```")].strip()
+            return code_block
+        
+        # trim response and show to user through message
+        code_snippet = trim_code_block(code_snippet)
+        arcpy.addMessage(code_snippet)
+        
+        # execute the code
+        exec(code_snippet)
     except Exception as e:
         arcpy.AddError(str(e))
         return
     
-    return insights
+    return code_snippet
         
 if __name__ == "__main__":
     api_key = arcpy.GetParameterAsText(0)
     selected_map = arcpy.GetParameterAsText(1)
-    question = arcpy.GetParameterAsText(2)
+    prompt = arcpy.GetParameterAsText(2)
     
     if selected_map:
         map_info = map_to_json(selected_map)
     else:
         map_info = map_to_json() # current active view
 
-    if question:
-        question = question.strip() # remove leading/trailing whitespace
+    if prompt:
+        prompt = prompt.strip() # remove leading/trailing whitespace
     
-    generate_insights(api_key, map_info, question)
+    generate_python(api_key, map_info, prompt)
