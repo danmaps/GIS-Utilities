@@ -27,6 +27,8 @@ The code should:
 - Select the features using arcpy.SelectLayerByAttribute_management.
 - Zoom the map to the selected features using the arcpy.mapping module.
 
+If the user asks about features with in a distance of another, use arcpy.SelectLayerByLocation_management in addition to arcpy.SelectLayerByAttribute_management.
+
 Please provide the only the complete Python code with these requirements.
 '''
 
