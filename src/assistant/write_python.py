@@ -5,12 +5,17 @@
 '''
 todo:
     - remove map selection parameter
-    - consider generating code as part of validation
-    - allow the user to edit the code in the tool UI
+    - generating code as part of validation?
+    - show user the map_info context in the tool UI?
+    - edit the code in the tool UI?
     - they can then choose to run it or save it as a new tool
     - consider making the output of the tool another tool with the AI code as the source code
         - no parameters (at first) for simplicity
         - allow the user to change the output format (notebook, python toolbox tool, python file)
+
+    - consider some logic to allow the AI to decide if it did a good job or not
+        - if the goal is to make a selection and move the map, see if the extent changed and number of selected features changed
+        - if not, ask the user for more information, like string value formats
 '''
 
 import requests
@@ -303,7 +308,8 @@ def get_ai_response(api_key, messages):
             time.sleep(1)
     raise Exception("Failed to get AI response after retries")
 
-def generate_python(api_key, json_data, prompt):
+
+def generate_python(api_key, map_info, prompt, explain=False):
     """
     Generate python using AI response for a given API key, JSON data, and a question.
 
@@ -320,7 +326,7 @@ def generate_python(api_key, json_data, prompt):
             {"role": "system", "content": python_PROMPT},
             {"role": "user", "content": f"{example_PROMPT}"},
             {"role": "assistant", "content": f"{example_PYTHON}"},
-            {"role": "system", "content": json.dumps(json_data, indent=4)},
+            {"role": "system", "content": json.dumps(map_info, indent=4)},
             {"role": "user", "content": f"{prompt}"}
         ]
 
@@ -336,10 +342,9 @@ def generate_python(api_key, json_data, prompt):
         
         # trim response and show to user through message
         code_snippet = trim_code_block(code_snippet)
-        arcpy.AddMessage(code_snippet)
+        msg = "AI generated code:\n\n" + code_snippet
+        arcpy.AddMessage(msg)
 
-        # execute the code
-        exec(code_snippet)
     except Exception as e:
         arcpy.AddError(str(e))
         return
@@ -347,16 +352,19 @@ def generate_python(api_key, json_data, prompt):
     return code_snippet
         
 if __name__ == "__main__":
-    api_key = arcpy.GetParameterAsText(0)
-    selected_map = arcpy.GetParameterAsText(1)
-    prompt = arcpy.GetParameterAsText(2)
-    
-    if selected_map:
-        map_info = map_to_json(selected_map)
-    else:
-        map_info = map_to_json() # current active view
+    api_key = arcpy.GetParameterAsText(0) # string
+    prompt = arcpy.GetParameterAsText(1) # string
+    eval = arcpy.GetParameterAsText(2) # boolean
 
-    if prompt:
-        prompt = prompt.strip() # remove leading/trailing whitespace
+    code_snippet = generate_python(api_key, map_to_json(), prompt.strip())
     
-    generate_python(api_key, map_info, prompt)
+    if eval:
+        try:
+            # execute the code
+            exec(code_snippet)
+
+        # catch AttributeError: 'NoneType' object has no attribute 'camera'
+        except AttributeError as e:
+            arcpy.AddError(f"{e}\n\nMake sure a map view is active.")
+        except Exception as e:
+            arcpy.AddError(f"{e}\n\nThe code may be invalid. Please check the code and try again.")
