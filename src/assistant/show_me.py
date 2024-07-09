@@ -2,6 +2,17 @@
 
 # takes a natural language prompt, interprets it, and generates Python code to make a selection and change the map extent
 
+'''
+todo:
+    - remove map selection parameter
+    - consider generating code as part of validation
+    - allow the user to edit the code in the tool UI
+    - they can then choose to run it or save it as a new tool
+    - consider making the output of the tool another tool with the AI code as the source code
+        - no parameters (at first) for simplicity
+        - allow the user to change the output format (notebook, python toolbox tool, python file)
+'''
+
 import requests
 import time
 import arcpy
@@ -29,7 +40,7 @@ The code should:
 
 If the user asks about features with in a distance of another, use arcpy.SelectLayerByLocation_management in addition to arcpy.SelectLayerByAttribute_management.
 
-Please provide the only the complete Python code with these requirements.
+Please provide the only the complete Python code with these requirements. Do not include any other text or comments.
 '''
 
 example_PROMPT = '''
