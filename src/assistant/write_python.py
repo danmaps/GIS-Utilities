@@ -4,7 +4,6 @@
 
 """
 todo:
-    - remove map selection parameter
     - generating code as part of validation?
     - show user the map_info context in the tool UI?
     - edit the code in the tool UI?
@@ -23,6 +22,7 @@ import time
 import arcpy
 import json
 import os
+import subprocess
 
 
 python_PROMPT = """
@@ -400,8 +400,11 @@ def generate_python(api_key, map_info, prompt, explain=False):
 
         # trim response and show to user through message
         code_snippet = trim_code_block(code_snippet)
-        msg = "AI generated code:\n\n" + code_snippet
-        arcpy.AddMessage(msg)
+        line = f"<html><hr></html>"
+        arcpy.AddMessage("AI generated code:")
+        arcpy.AddMessage(line)
+        arcpy.AddMessage(code_snippet)
+        arcpy.AddMessage(line)
 
     except Exception as e:
         arcpy.AddError(str(e))
@@ -420,10 +423,12 @@ def get_layer_info(input_layer):
     Returns:
     dict: JSON object representing the layer.
     """
-    layer = arcpy.mapping.Layer(arcpy.mapping.ListLayers(input_layer)[0])
+    aprx = arcpy.mp.ArcGISProject("CURRENT")
+    active_map = aprx.activeMap
+    layer = active_map.listLayers(input_layer)[0]
 
     # get sample of data if more than 5 records
-    if layer.dataCount > 5:
+    if arcpy.management.GetCount(layer.dataSource)[0] > 5:
         return {"name": layer.name, "path": layer.dataSource, "data": layer.data[0:5]}
     else:
         return {"name": layer.name, "path": layer.dataSource}
@@ -446,22 +451,48 @@ def combine_map_and_layer_info(map_info, layer_info=None):
     return {"map": map_info, "layer": layer_info}
 
 
-if __name__ == "__main__":
-    # Try to get the API key from the environment variable first
-    default_api_key = os.environ.get("OPENAI_API_KEY", "")
-    arcpy.AddMessage(f"Using API key: {default_api_key}")
+def get_env_var(var_name="OPENAI_API_KEY"):
+    arcpy.AddMessage(f"Fetching API key from {var_name} environment variable.")
+    return os.environ.get(var_name, "")
 
+def get_api_key_from_credential_manager():
+    try:
+        # Use PowerShell to retrieve the credential
+        result = subprocess.run(
+            ["powershell", "-Command", 
+             "Get-StoredCredential -Target 'OpenAI_API_Key' | Select-Object -Property UserName, Password | ConvertTo-Json"],
+            capture_output=True, text=True, check=True
+        )
+        
+        # Parse the JSON output
+        credential = json.loads(result.stdout)
+        
+        # The Password property contains the API key
+        return credential['Password']
+    except subprocess.CalledProcessError:
+        print("Error retrieving the API key from Windows Credential Manager.")
+        return None
+    except json.JSONDecodeError:
+        print("Error parsing the credential information.")
+        return None
+    except KeyError:
+        print("API key not found in the credential.")
+        return None
+
+
+if __name__ == "__main__":
     # Get the API key from the tool parameter, use the environment variable as default
-    api_key = arcpy.GetParameterAsText(0) or default_api_key
-    # feature_layer = arcpy.GetParameterAsText(1) # feature layer
-    prompt = arcpy.GetParameterAsText(1)  # string
-    eval = arcpy.GetParameter(2)  # boolean
-    context = arcpy.GetParameterAsText(3)  # string with multiple lines
+    api_key = arcpy.GetParameterAsText(0) or get_env_var() # hidden string
+    feature_layer = arcpy.GetParameterAsText(1) # feature layer (multiple)
+    prompt = arcpy.GetParameterAsText(2)  # string
+    eval = arcpy.GetParameter(3)  # boolean
+    context = arcpy.GetParameterAsText(4)  # string with multiple lines
+
+    derived_context = arcpy.SetParameterAsText(5,combine_map_and_layer_info(map_to_json(),get_layer_info(feature_layer)))
 
     code_snippet = generate_python(
         api_key,
-        combine_map_and_layer_info(map_to_json()),
-        # get_layer_info(feature_layer)),
+        derived_context,
         prompt.strip(),
     )
 
