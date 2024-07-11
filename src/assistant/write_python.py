@@ -177,6 +177,23 @@ def map_to_json(in_map=None, output_json_path=None):
 
     # Function to convert metadata to a dictionary
     def metadata_to_dict(metadata):
+        """
+        Convert the given metadata object to a dictionary.
+
+        Parameters:
+            metadata (object): The metadata object to be converted.
+
+        Returns:
+            dict: The dictionary representation of the metadata object.
+
+        Raises:
+            None.
+
+        Example:
+            >>> metadata = Metadata(title="My Map", tags=["Tag1", "Tag2"], summary="This is my map.", description="This is a description of my map.", credits="Credits for the map.", accessConstraints="Access constraints for the map.", XMax=180, XMin=-180, YMax=90, YMin=-90)
+            >>> metadata_to_dict(metadata)
+            {'title': 'My Map', 'tags': ['Tag1', 'Tag2'], 'summary': 'This is my map.', 'description': 'This is a description of my map.', 'credits': 'Credits for the map.', 'access_constraints': 'Access constraints for the map.', 'extent': {'xmax': 180, 'xmin': -180, 'ymax': 90, 'ymin': -90}}
+        """
         if metadata is None:
             return "No metadata"
 
