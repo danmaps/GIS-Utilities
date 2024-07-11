@@ -2,7 +2,7 @@
 
 # takes a natural language prompt, interprets it, and generates Python code to make a selection and change the map extent
 
-'''
+"""
 todo:
     - remove map selection parameter
     - generating code as part of validation?
@@ -16,15 +16,16 @@ todo:
     - consider some logic to allow the AI to decide if it did a good job or not
         - if the goal is to make a selection and move the map, see if the extent changed and number of selected features changed
         - if not, ask the user for more information, like string value formats
-'''
+"""
 
 import requests
 import time
 import arcpy
 import json
+import os
 
 
-python_PROMPT = '''
+python_PROMPT = """
 I have a map in ArcGIS Pro. I've gathered information about this map and will give it to you in JSON format containing information about the map, including the map name, title, description, spatial reference, layers, and properties.
 
 Based on this information, Write Python code that performs the following tasks in ArcGIS Pro:
@@ -46,13 +47,13 @@ The code should:
 If the user asks about features with in a distance of another, use arcpy.SelectLayerByLocation_management in addition to arcpy.SelectLayerByAttribute_management.
 
 Please provide the only the complete Python code with these requirements. Do not include any other text or comments.
-'''
+"""
 
-example_PROMPT = '''
+example_PROMPT = """
 show me the largest polygon in states
-'''
+"""
 
-example_PYTHON = '''
+example_PYTHON = """
 import arcpy
 
 # User prompt: "show me the largest polygon in states"
@@ -74,7 +75,8 @@ arcpy.management.SelectLayerByAttribute(layer, "NEW_SELECTION", attribute_query)
 
 # Zoom to the extent of the selected features
 active_view.camera.setExtent(active_view.getLayerExtent(layer))
-'''
+"""
+
 
 def map_to_json(in_map=None, output_json_path=None):
     """
@@ -172,12 +174,12 @@ def map_to_json(in_map=None, output_json_path=None):
             }
         }
     """
-	
+
     # Function to convert metadata to a dictionary
     def metadata_to_dict(metadata):
         if metadata is None:
             return "No metadata"
-        
+
         extent_dict = {}
         if hasattr(metadata, "XMax"):
             extent_dict["xmax"] = metadata.XMax
@@ -187,39 +189,55 @@ def map_to_json(in_map=None, output_json_path=None):
             extent_dict["ymax"] = metadata.YMax
         if hasattr(metadata, "YMin"):
             extent_dict["ymin"] = metadata.YMin
-        
+
         meta_dict = {
             "title": metadata.title if hasattr(metadata, "title") else "No title",
             "tags": metadata.tags if hasattr(metadata, "tags") else "No tags",
-            "summary": metadata.summary if hasattr(metadata, "summary") else "No summary",
-            "description": metadata.description if hasattr(metadata, "description") else "No description",
-            "credits": metadata.credits if hasattr(metadata, "credits") else "No credits",
-            "access_constraints": metadata.accessConstraints if hasattr(metadata, "accessConstraints") else "No access constraints",
-            "extent": extent_dict
+            "summary": metadata.summary
+            if hasattr(metadata, "summary")
+            else "No summary",
+            "description": metadata.description
+            if hasattr(metadata, "description")
+            else "No description",
+            "credits": metadata.credits
+            if hasattr(metadata, "credits")
+            else "No credits",
+            "access_constraints": metadata.accessConstraints
+            if hasattr(metadata, "accessConstraints")
+            else "No access constraints",
+            "extent": extent_dict,
         }
         return meta_dict
 
-    aprx = arcpy.mp.ArcGISProject("CURRENT")    
+    aprx = arcpy.mp.ArcGISProject("CURRENT")
     if not in_map:
         active_map = aprx.activeMap
         if not active_map:
             raise ValueError("No active map found in the current project.")
     else:
         active_map = aprx.listMaps(in_map)[0]
-        
+
     # Collect map information
     map_info = {
         "map_name": active_map.name,
-        "title": active_map.title if hasattr(active_map, 'title') else "No title",
-        "description": active_map.description if hasattr(active_map, 'description') else "No description",
+        "title": active_map.title if hasattr(active_map, "title") else "No title",
+        "description": active_map.description
+        if hasattr(active_map, "description")
+        else "No description",
         "spatial_reference": active_map.spatialReference.name,
         "layers": [],
         "properties": {
-            "rotation": active_map.rotation if hasattr(active_map, 'rotation') else "No rotation",
-            "units": active_map.units if hasattr(active_map, 'units') else "No units",
-            "time_enabled": active_map.isTimeEnabled if hasattr(active_map, 'isTimeEnabled') else "No time enabled",
-            "metadata": metadata_to_dict(active_map.metadata) if hasattr(active_map, 'metadata') else "No metadata",
-        }
+            "rotation": active_map.rotation
+            if hasattr(active_map, "rotation")
+            else "No rotation",
+            "units": active_map.units if hasattr(active_map, "units") else "No units",
+            "time_enabled": active_map.isTimeEnabled
+            if hasattr(active_map, "isTimeEnabled")
+            else "No time enabled",
+            "metadata": metadata_to_dict(active_map.metadata)
+            if hasattr(active_map, "metadata")
+            else "No metadata",
+        },
     }
 
     # Iterate through layers and collect information
@@ -230,51 +248,71 @@ def map_to_json(in_map=None, output_json_path=None):
             "raster_layer": layer.isRasterLayer,
             "web_layer": layer.isWebLayer,
             "visible": layer.visible,
-            "metadata": metadata_to_dict(layer.metadata) if hasattr(layer, 'metadata') else "No metadata"
+            "metadata": metadata_to_dict(layer.metadata)
+            if hasattr(layer, "metadata")
+            else "No metadata",
         }
 
         if layer.isFeatureLayer:
             dataset = arcpy.Describe(layer.dataSource)
-            layer_info.update({
-                "spatial_reference": dataset.spatialReference.name if hasattr(dataset, "spatialReference") else "Unknown",
-                "extent": {
-                    "xmin": dataset.extent.XMin,
-                    "ymin": dataset.extent.YMin,
-                    "xmax": dataset.extent.XMax,
-                    "ymax": dataset.extent.YMax
-                } if hasattr(dataset, "extent") else "Unknown",
-                "fields": [],
-                "record_count": 0,
-                "source_type": dataset.dataType if hasattr(dataset, "dataType") else "Unknown",
-                "geometry_type": dataset.shapeType if hasattr(dataset, "shapeType") else "Unknown",
-                "renderer": layer.symbology.renderer.type if hasattr(layer, "symbology") and hasattr(layer.symbology, "renderer") else "Unknown",
-                "labeling": layer.showLabels if hasattr(layer, "showLabels") else "Unknown",
-            })
-            
+            layer_info.update(
+                {
+                    "spatial_reference": dataset.spatialReference.name
+                    if hasattr(dataset, "spatialReference")
+                    else "Unknown",
+                    "extent": {
+                        "xmin": dataset.extent.XMin,
+                        "ymin": dataset.extent.YMin,
+                        "xmax": dataset.extent.XMax,
+                        "ymax": dataset.extent.YMax,
+                    }
+                    if hasattr(dataset, "extent")
+                    else "Unknown",
+                    "fields": [],
+                    "record_count": 0,
+                    "source_type": dataset.dataType
+                    if hasattr(dataset, "dataType")
+                    else "Unknown",
+                    "geometry_type": dataset.shapeType
+                    if hasattr(dataset, "shapeType")
+                    else "Unknown",
+                    "renderer": layer.symbology.renderer.type
+                    if hasattr(layer, "symbology")
+                    and hasattr(layer.symbology, "renderer")
+                    else "Unknown",
+                    "labeling": layer.showLabels
+                    if hasattr(layer, "showLabels")
+                    else "Unknown",
+                }
+            )
+
             # Get fields information
             if hasattr(dataset, "fields"):
                 for field in dataset.fields:
                     field_info = {
                         "name": field.name,
                         "type": field.type,
-                        "length": field.length
+                        "length": field.length,
                     }
                     layer_info["fields"].append(field_info)
-            
+
             # Get record count if the layer has records
             if dataset.dataType in ["FeatureClass", "Table"]:
-                layer_info["record_count"] = int(arcpy.management.GetCount(layer.dataSource)[0])
+                layer_info["record_count"] = int(
+                    arcpy.management.GetCount(layer.dataSource)[0]
+                )
 
         map_info["layers"].append(layer_info)
 
     if output_json_path:
         # Write the map information to a JSON file
-        with open(output_json_path, 'w') as json_file:
+        with open(output_json_path, "w") as json_file:
             json.dump(map_info, json_file, indent=4)
 
-        print(f"Map information has been written to {output_json_path}")    
+        print(f"Map information has been written to {output_json_path}")
 
     return map_info
+
 
 def get_ai_response(api_key, messages):
     """
@@ -287,20 +325,22 @@ def get_ai_response(api_key, messages):
     Returns:
     str: AI response.
     """
-    headers = {
-        "Authorization": f"Bearer {api_key}",
-        "Content-Type": "application/json"
-    }
+    headers = {"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"}
     data = {
         "model": "gpt-4o",
         "messages": messages,
-        "temperature": 0.5, # be more predictable, less creative
+        "temperature": 0.5,  # be more predictable, less creative
         "max_tokens": 500,
     }
 
     for _ in range(3):
         try:
-            response = requests.post("https://api.openai.com/v1/chat/completions", headers=headers, json=data, verify=False)
+            response = requests.post(
+                "https://api.openai.com/v1/chat/completions",
+                headers=headers,
+                json=data,
+                verify=False,
+            )
             response.raise_for_status()
             return response.json()["choices"][0]["message"]["content"].strip()
         except requests.exceptions.RequestException as e:
@@ -327,19 +367,20 @@ def generate_python(api_key, map_info, prompt, explain=False):
             {"role": "user", "content": f"{example_PROMPT}"},
             {"role": "assistant", "content": f"{example_PYTHON}"},
             {"role": "system", "content": json.dumps(map_info, indent=4)},
-            {"role": "user", "content": f"{prompt}"}
+            {"role": "user", "content": f"{prompt}"},
         ]
 
     try:
         code_snippet = get_ai_response(api_key, messages)
+
         def trim_code_block(code_block):
             # Remove the ```python from the beginning and ``` from the end
             if code_block.startswith("```python"):
-                code_block = code_block[len("```python"):].strip()
+                code_block = code_block[len("```python") :].strip()
             if code_block.endswith("```"):
-                code_block = code_block[:-len("```")].strip()
+                code_block = code_block[: -len("```")].strip()
             return code_block
-        
+
         # trim response and show to user through message
         code_snippet = trim_code_block(code_snippet)
         msg = "AI generated code:\n\n" + code_snippet
@@ -348,23 +389,78 @@ def generate_python(api_key, map_info, prompt, explain=False):
     except Exception as e:
         arcpy.AddError(str(e))
         return
-    
-    return code_snippet
-        
-if __name__ == "__main__":
-    api_key = arcpy.GetParameterAsText(0) # string
-    prompt = arcpy.GetParameterAsText(1) # string
-    eval = arcpy.GetParameterAsText(2) # boolean
 
-    code_snippet = generate_python(api_key, map_to_json(), prompt.strip())
-    
-    if eval:
+    return code_snippet
+
+
+def get_layer_info(input_layer):
+    """
+    Gathers layer information, including data records, for the selected layer.
+    This is for context for the AI response. Keeping this separate from the map
+    information might make users feel more comfortable sharing data with the AI.
+    They can easily control, and see/edit, what data is passed to the AI.
+
+    Returns:
+    dict: JSON object representing the layer.
+    """
+    layer = arcpy.mapping.Layer(arcpy.mapping.ListLayers(input_layer)[0])
+
+    # get sample of data if more than 5 records
+    if layer.dataCount > 5:
+        return {"name": layer.name, "path": layer.dataSource, "data": layer.data[0:5]}
+    else:
+        return {"name": layer.name, "path": layer.dataSource}
+
+    return {
+        "name": layer.name,
+        "path": layer.dataSource
+        # "data": layer.data
+        # "record_count": int(arcpy.management.GetCount(layer.dataSource)[0])
+    }
+
+
+def combine_map_and_layer_info(map_info, layer_info=None):
+    """
+    Combines the map and layer information into a single JSON object.
+
+    Returns:
+    dict: JSON object representing the map and layer information.
+    """
+    return {"map": map_info, "layer": layer_info}
+
+
+if __name__ == "__main__":
+    # Try to get the API key from the environment variable first
+    default_api_key = os.environ.get("OPENAI_API_KEY", "")
+    arcpy.AddMessage(f"Using API key: {default_api_key}")
+
+    # Get the API key from the tool parameter, use the environment variable as default
+    api_key = arcpy.GetParameterAsText(0) or default_api_key
+    # feature_layer = arcpy.GetParameterAsText(1) # feature layer
+    prompt = arcpy.GetParameterAsText(1)  # string
+    eval = arcpy.GetParameter(2)  # boolean
+    context = arcpy.GetParameterAsText(3)  # string with multiple lines
+
+    code_snippet = generate_python(
+        api_key,
+        combine_map_and_layer_info(map_to_json()),
+        # get_layer_info(feature_layer)),
+        prompt.strip(),
+    )
+
+    if eval == True:
         try:
-            # execute the code
-            exec(code_snippet)
+            if code_snippet:
+                # execute the code
+                arcpy.AddMessage("Executing code... fingers crossed!")
+                exec(code_snippet)
+            else:
+                raise Exception("No code generated. Please try again.")
 
         # catch AttributeError: 'NoneType' object has no attribute 'camera'
         except AttributeError as e:
             arcpy.AddError(f"{e}\n\nMake sure a map view is active.")
         except Exception as e:
-            arcpy.AddError(f"{e}\n\nThe code may be invalid. Please check the code and try again.")
+            arcpy.AddError(
+                f"{e}\n\nThe code may be invalid. Please check the code and try again."
+            )
