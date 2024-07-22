@@ -439,7 +439,7 @@ def get_api_key_from_credential_manager():
         print("API key not found in the credential.")
         return None
 
-def add_ai_response_to_feature_layer(api_key, in_layer, out_layer, field_name, prompt_template, sql_query=None):
+def add_ai_response_to_feature_layer(api_key, source, in_layer, out_layer, field_name, prompt_template, sql_query=None):
     """
     Enriches an existing feature layer by adding a new field with AI-generated responses.
 
@@ -466,12 +466,12 @@ def add_ai_response_to_feature_layer(api_key, in_layer, out_layer, field_name, p
         arcpy.management.AddField(layer_to_use, field_name + "_AI", "TEXT")
         field_name += "_AI"
 
-    def generate_ai_responses_for_feature_class(feature_class, field_name, prompt_template):
+    def generate_ai_responses_for_feature_class(source, feature_class, field_name, prompt_template):
         """
         Generates AI responses for each feature in the feature class and updates the new field with these responses.
 
         Parameters:
-        api_key (str): API key for OpenAI.
+        source (str): Source to use for the intelligence.
         feature_class (str): Path to the feature class.
         field_name (str): Name of the field to add the AI responses.
         prompt_template (str): Template for the prompt to be used by AI.
@@ -509,11 +509,17 @@ def add_ai_response_to_feature_layer(api_key, in_layer, out_layer, field_name, p
             arcpy.AddMessage("prompts_dict is empty.")
 
         # Get AI responses for each prompt
-        role = "You are a helpful assistant. Respond in one simple sentence without preamble or extra context."
-        responses_dict = {
-            oid: get_ai_response(api_key, [{"role": "system", "content": role}, {"role": "user", "content": prompt}])
-            for oid, prompt in prompts_dict.items()
-        }
+        if source == "OpenAI":
+            role = "You are a helpful assistant. Respond in one simple sentence without preamble or extra context."
+            responses_dict = {
+                oid: get_ai_response(api_key, [{"role": "system", "content": role}, {"role": "user", "content": prompt}])
+                for oid, prompt in prompts_dict.items()
+            }
+        elif source == "Wolfram Alpha":
+            responses_dict = {
+                oid: get_ai_response(get_env_var("WOLFRAM_ALPHA_API_KEY"), [{"role": "system", "content": role}, {"role": "user", "content": prompt}])
+                for oid, prompt in prompts_dict.items()
+            }
 
         # Use an UpdateCursor to write the AI responses back to the feature class
         with arcpy.da.UpdateCursor(feature_class, [oid_field_name, field_name]) as cursor:
@@ -523,7 +529,7 @@ def add_ai_response_to_feature_layer(api_key, in_layer, out_layer, field_name, p
                     row[1] = responses_dict[oid]
                     cursor.updateRow(row)
     
-    generate_ai_responses_for_feature_class(layer_to_use, field_name, prompt_template)
+    generate_ai_responses_for_feature_class(source, layer_to_use, field_name, prompt_template)
 
 
 class Toolbox:
@@ -586,6 +592,16 @@ class GenerateAIField(object):
 
     def getParameterInfo(self):
         """Define the tool parameters."""
+        source = arcpy.Parameter(
+            displayName="Source",
+            name="source",
+            datatype="GPString",
+            parameterType="Required",
+            direction="Input",
+            multiValue=True
+        )
+        source.controlCLSID = '{172840BF-D385-4F83-80E8-2AC3B79EB0E0}'
+
         in_layer = arcpy.Parameter(
             displayName="Input Layer",
             name="in_layer",
@@ -626,7 +642,7 @@ class GenerateAIField(object):
             direction="Input"
         )
 
-        params = [in_layer, out_layer, field_name, prompt, sql]
+        params = [source, in_layer, out_layer, field_name, prompt, sql]
         # params = None
         return params
 
@@ -638,6 +654,7 @@ class GenerateAIField(object):
         """Modify the values and properties of parameters before internal
         validation is performed.  This method is called whenever a parameter
         has been changed."""
+        self.params[0].filter.list = ["OpenAI GPT4o-mini", "Wolfram Alpha"]
         return
 
     def updateMessages(self, parameters):
@@ -654,7 +671,8 @@ class GenerateAIField(object):
                                          parameters[1].valueAsText,
                                          parameters[2].valueAsText,
                                          parameters[3].valueAsText,
-                                         parameters[4].valueAsText)
+                                         parameters[4].valueAsText,
+                                         parameters[5].valueAsText)
         return
 
     def postExecute(self, parameters):
