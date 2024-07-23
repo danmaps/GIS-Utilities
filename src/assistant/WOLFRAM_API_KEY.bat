@@ -1,15 +1,15 @@
 @echo off
 setlocal enabledelayedexpansion
 
-echo This script will set up your OpenAI API key as a persistent environment variable.
-echo Please make sure you have your OpenAI API key ready.
+echo This script will set up your Wolfram Alpha App ID as a persistent environment variable.
+echo Please make sure you have your Wolfram Alpha App ID ready.
 echo.
 
 :PROMPT
-set /p API_KEY="Enter your Wolfram APP ID: "
+set /p API_KEY="Enter your Wolfram Alpha App ID: "
 
 if "!API_KEY!"=="" (
-    echo API key cannot be empty. Please try again.
+    echo App ID cannot be empty. Please try again.
     goto PROMPT
 )
 

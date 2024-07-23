@@ -4,6 +4,8 @@ import arcpy
 import json
 import os
 import subprocess
+import xml.etree.ElementTree as ET
+
 
 import prompts
 # import importLib
@@ -273,13 +275,14 @@ def get_ai_response(source, api_key, messages):
 
     Parameters:
     source (str): Source of intelligence.
-    api_key (str): API key for OpenAI.
-    messages (list): List of message dictionaries for the AI chat.
+    api_key (str): API key for the selected source.
+    messages (list): List of message dictionaries including the user prompt.
 
     Returns:
     str: AI response.
     """
-    if source == "openai":
+    # arcpy.AddMessage(f"Generating {source} response...")
+    if source == "OpenAI":
         headers = {"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"}
         data = {
             "model": "gpt-4o-mini",
@@ -303,9 +306,10 @@ def get_ai_response(source, api_key, messages):
                 arcpy.AddWarning(f"Retrying openai response generation due to: {e}")
                 time.sleep(1)
         raise Exception("Failed to get openai response after retries")
-    elif source == "wolframalpha":
+    elif source == "Wolfram Alpha":
         headers = {"Content-Type": "application/x-www-form-urlencoded"}
-        data = {"appid": api_key, "input": messages}
+        data = {"appid": api_key, "input": messages[0]['input']}
+        # data = {"appid": "AX338J-7Y83GVP84G", "input": "what is Arizona's state bird?"}
 
         # Retry up to 3 times if the request fails
         for _ in range(3):
@@ -317,11 +321,20 @@ def get_ai_response(source, api_key, messages):
                     verify=False,
                 )
                 response.raise_for_status()
-                return next(
-                    item["value"]
-                    for item in response.json()["queryresult"]["pods"]
-                    if item["title"] == "Result"
-                ).strip()
+
+                # arcpy.AddMessage("Response: " + response.text) # debug
+                # Parsing the XML response
+                root = ET.fromstring(response.content)
+                if root.attrib.get('success') == 'true':
+                    for pod in root.findall(".//pod[@title='Result']"):
+                        for subpod in pod.findall('subpod'):
+                            plaintext = subpod.find('plaintext')
+                            if plaintext is not None and plaintext.text:
+                                return plaintext.text.strip()
+                    arcpy.AddWarning("Result pod not found in the response")
+                else:
+                    arcpy.AddWarning("Query was not successful")
+                
             except requests.exceptions.RequestException as e:
                 arcpy.AddWarning(f"Retrying wolframalpha response generation due to: {e}")
                 time.sleep(1)
@@ -428,42 +441,10 @@ def get_layer_info(input_layers):
     return layers_info
 
 
-def combine_map_and_layer_info(map_info, layer_info=None):
-    """
-    Combines the map and layer information into a single JSON object.
-
-    Returns:
-    dict: JSON object representing the map and layer information.
-    """
-    return {"map": map_info, "layer": layer_info}
-
 def get_env_var(var_name="OPENAI_API_KEY"):
     arcpy.AddMessage(f"Fetching API key from {var_name} environment variable.")
     return os.environ.get(var_name, "")
 
-def get_api_key_from_credential_manager():
-    try:
-        # Use PowerShell to retrieve the credential
-        result = subprocess.run(
-            ["powershell", "-Command", 
-             "Get-StoredCredential -Target 'OpenAI_API_Key' | Select-Object -Property UserName, Password | ConvertTo-Json"],
-            capture_output=True, text=True, check=True
-        )
-        
-        # Parse the JSON output
-        credential = json.loads(result.stdout)
-        
-        # The Password property contains the API key
-        return credential['Password']
-    except subprocess.CalledProcessError:
-        print("Error retrieving the API key from Windows Credential Manager.")
-        return None
-    except json.JSONDecodeError:
-        print("Error parsing the credential information.")
-        return None
-    except KeyError:
-        print("API key not found in the credential.")
-        return None
 
 def add_ai_response_to_feature_layer(api_key, source, in_layer, out_layer, field_name, prompt_template, sql_query=None):
     """
@@ -483,7 +464,8 @@ def add_ai_response_to_feature_layer(api_key, source, in_layer, out_layer, field
     else:
         layer_to_use = in_layer
 
-    arcpy.AddMessage(layer_to_use)
+    # debug
+    # arcpy.AddMessage(layer_to_use)
 
     # Add new field for AI responses
     if field_name not in [f.name for f in arcpy.ListFields(layer_to_use)]:
@@ -543,7 +525,7 @@ def add_ai_response_to_feature_layer(api_key, source, in_layer, out_layer, field
             }
         elif source == "Wolfram Alpha":
             responses_dict = {
-                oid: get_ai_response(source, get_env_var("WOLFRAM_ALPHA_API_KEY"), [{"input": prompt}])
+                oid: get_ai_response(source, api_key, [{"input": prompt}])
                 for oid, prompt in prompts_dict.items()
             }
             
@@ -625,9 +607,10 @@ class GenerateAIField(object):
             datatype="GPString",
             parameterType="Required",
             direction="Input",
-            multiValue=True
+            # multiValue=True
         )
         # source.controlCLSID = '{172840BF-D385-4F83-80E8-2AC3B79EB0E0}'
+        source.filter.type = "ValueList"
         source.filter.list = ["OpenAI", "Wolfram Alpha"]
         source.value = "OpenAI"
 
@@ -695,7 +678,8 @@ class GenerateAIField(object):
     def execute(self, parameters, messages):
         """The source code of the tool."""
         # Get the API key from the environment variable
-        api_key = get_env_var()
+        api_key = get_env_var("WOLFRAMALPHA_API_KEY")
+        arcpy.AddMessage(f"WOLFRAMALPHA_API_KEY: {api_key}")
         add_ai_response_to_feature_layer(api_key,
                                          parameters[0].valueAsText,
                                          parameters[1].valueAsText,
@@ -806,7 +790,8 @@ class GenerateAIPythonCode(object):
         validation is performed.  This method is called whenever a parameter
         has been changed."""
         layers = parameters[0].values
-        context_json = combine_map_and_layer_info(map_to_json(),get_layer_info(layers))
+        # combine map and layer data into one JSON
+        context_json = {"map": map_to_json(), "layers": get_layer_info(layers)}
         parameters[3].value = json.dumps(context_json, indent=2)
         return
 
