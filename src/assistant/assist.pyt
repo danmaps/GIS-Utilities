@@ -267,39 +267,65 @@ def map_to_json(in_map=None, output_json_path=None):
     return map_info
 
 
-def get_ai_response(api_key, messages):
+def get_ai_response(source, api_key, messages):
     """
     Generates an AI response for a given set of messages using the chat completions endpoint.
 
     Parameters:
+    source (str): Source of intelligence.
     api_key (str): API key for OpenAI.
     messages (list): List of message dictionaries for the AI chat.
 
     Returns:
     str: AI response.
     """
-    headers = {"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"}
-    data = {
-        "model": "gpt-4o-mini",
-        "messages": messages,
-        "temperature": 0.5,  # be more predictable, less creative
-        "max_tokens": 500,
-    }
+    if source == "openai":
+        headers = {"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"}
+        data = {
+            "model": "gpt-4o-mini",
+            "messages": messages,
+            "temperature": 0.5,  # be more predictable, less creative
+            "max_tokens": 500,
+        }
 
-    for _ in range(3):
-        try:
-            response = requests.post(
-                "https://api.openai.com/v1/chat/completions",
-                headers=headers,
-                json=data,
-                verify=False,
-            )
-            response.raise_for_status()
-            return response.json()["choices"][0]["message"]["content"].strip()
-        except requests.exceptions.RequestException as e:
-            arcpy.AddWarning(f"Retrying AI response generation due to: {e}")
-            time.sleep(1)
-    raise Exception("Failed to get AI response after retries")
+        # Retry up to 3 times if the request fails
+        for _ in range(3):
+            try:
+                response = requests.post(
+                    "https://api.openai.com/v1/chat/completions",
+                    headers=headers,
+                    json=data,
+                    verify=False,
+                )
+                response.raise_for_status()
+                return response.json()["choices"][0]["message"]["content"].strip()
+            except requests.exceptions.RequestException as e:
+                arcpy.AddWarning(f"Retrying openai response generation due to: {e}")
+                time.sleep(1)
+        raise Exception("Failed to get openai response after retries")
+    elif source == "wolframalpha":
+        headers = {"Content-Type": "application/x-www-form-urlencoded"}
+        data = {"appid": api_key, "input": messages}
+
+        # Retry up to 3 times if the request fails
+        for _ in range(3):
+            try:
+                response = requests.post(
+                    "https://api.wolframalpha.com/v2/query",
+                    headers=headers,
+                    data=data,
+                    verify=False,
+                )
+                response.raise_for_status()
+                return next(
+                    item["value"]
+                    for item in response.json()["queryresult"]["pods"]
+                    if item["title"] == "Result"
+                ).strip()
+            except requests.exceptions.RequestException as e:
+                arcpy.AddWarning(f"Retrying wolframalpha response generation due to: {e}")
+                time.sleep(1)
+        raise Exception("Failed to get wolframalpha response after retries")
 
 
 def generate_python(api_key, map_info, prompt, explain=False):
@@ -512,14 +538,15 @@ def add_ai_response_to_feature_layer(api_key, source, in_layer, out_layer, field
         if source == "OpenAI":
             role = "You are a helpful assistant. Respond in one simple sentence without preamble or extra context."
             responses_dict = {
-                oid: get_ai_response(api_key, [{"role": "system", "content": role}, {"role": "user", "content": prompt}])
+                oid: get_ai_response(source, api_key, [{"role": "system", "content": role}, {"role": "user", "content": prompt}])
                 for oid, prompt in prompts_dict.items()
             }
         elif source == "Wolfram Alpha":
             responses_dict = {
-                oid: get_ai_response(get_env_var("WOLFRAM_ALPHA_API_KEY"), [{"role": "system", "content": role}, {"role": "user", "content": prompt}])
+                oid: get_ai_response(source, get_env_var("WOLFRAM_ALPHA_API_KEY"), [{"input": prompt}])
                 for oid, prompt in prompts_dict.items()
             }
+            
 
         # Use an UpdateCursor to write the AI responses back to the feature class
         with arcpy.da.UpdateCursor(feature_class, [oid_field_name, field_name]) as cursor:
@@ -600,7 +627,9 @@ class GenerateAIField(object):
             direction="Input",
             multiValue=True
         )
-        source.controlCLSID = '{172840BF-D385-4F83-80E8-2AC3B79EB0E0}'
+        # source.controlCLSID = '{172840BF-D385-4F83-80E8-2AC3B79EB0E0}'
+        source.filter.list = ["OpenAI", "Wolfram Alpha"]
+        source.value = "OpenAI"
 
         in_layer = arcpy.Parameter(
             displayName="Input Layer",
@@ -654,7 +683,8 @@ class GenerateAIField(object):
         """Modify the values and properties of parameters before internal
         validation is performed.  This method is called whenever a parameter
         has been changed."""
-        self.params[0].filter.list = ["OpenAI GPT4o-mini", "Wolfram Alpha"]
+        source = parameters[0].value
+
         return
 
     def updateMessages(self, parameters):
