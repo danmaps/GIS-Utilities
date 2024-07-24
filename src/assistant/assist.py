@@ -259,6 +259,64 @@ def map_to_json(in_map=None, output_json_path=None):
 
     return map_info
 
+def convert_series_to_numeric(api_key, field_values):
+    """Convert a series of text representations of numeric data to actual numeric values using OpenAI API."""
+    # Create a prompt for the OpenAI API to clean and convert the data
+    prompt = (
+        "Convert the following text representations of numeric data into consistent numeric values:\n\n"
+    )
+    for value in field_values:
+        prompt += f"{value}\n"
+
+    headers = {"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"}
+    data = {
+        "model": "gpt-4o-mini",
+        "messages": prompt,
+        "temperature": 0.3,  # be more predictable, less creative
+        "max_tokens": 1500,
+        "n": 1,
+        "stop": None,
+    }
+    # Retry up to 3 times if the request fails
+    for _ in range(3):
+        try:
+            response = requests.post(
+                "https://api.openai.com/v1/chat/completions",
+                headers=headers,
+                json=data,
+                verify=False,
+            )
+            response.raise_for_status()
+            return response.json()["choices"][0]["message"]["content"].strip()
+        except requests.exceptions.RequestException as e:
+            arcpy.AddWarning(f"Retrying openai response generation due to: {e}")
+            time.sleep(1)
+
+    converted_values = response.choices[0].text.strip().split("\n")
+    numeric_values = [parse_numeric_value(val) for val in converted_values]
+    return numeric_values
+
+def parse_numeric_value(text_value):
+    """
+    Parses a text value representing a numeric value and returns the corresponding numeric value.
+
+    Args:
+        text_value (str): The text value to be parsed.
+
+    Returns:
+        float or int: The parsed numeric value. If the text value contains a comma, it is replaced with an empty
+        string and the resulting value is converted to a float. If the resulting value contains a dot, it is returned
+        as a float. Otherwise, it is converted to an integer.
+    """
+    if "," in text_value:
+        no_commas = float(text_value.replace(",", ""))
+    if "." in no_commas:
+        return no_commas
+    else:
+        return int(no_commas)
+
+    
+    
 
 def get_openai_response(api_key, messages):
     headers = {"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"}
@@ -345,7 +403,7 @@ def generate_python(api_key, map_info, prompt, explain=False):
         ]
 
     try:
-        code_snippet = get_ai_response(api_key, messages)
+        code_snippet = get_openai_response(api_key, messages)
 
         def trim_code_block(code_block):
             # Remove the ```python from the beginning and ``` from the end
@@ -519,3 +577,5 @@ def add_ai_response_to_feature_layer(api_key, source, in_layer, out_layer, field
                     cursor.updateRow(row)
     
     generate_ai_responses_for_feature_class(source, layer_to_use, field_name, prompt_template)
+
+

@@ -11,7 +11,8 @@ class Toolbox:
         self.tools = [GenerateAIFeatureLayer,
                       GenerateAIField,
                       GenerateAIMapInsights,
-                      GenerateAIPythonCode]
+                      GenerateAIPythonCode,
+                      ConvertTextToNumeric]
 
 
 class GenerateAIFeatureLayer(object):
@@ -209,7 +210,6 @@ class GenerateAIPythonCode(object):
             direction="Input",
             multiValue=True,
         )
-        # layers.controlCLSID = '{60061247-BCA8-473E-A7AF-A2026DDE1C2D}'
 
         prompt = arcpy.Parameter(
             displayName="Prompt",
@@ -263,20 +263,13 @@ class GenerateAIPythonCode(object):
 
     def execute(self, parameters, messages):
 
-        # importLib.reload(prompts)
-
         # Get the API key from the environment variable
-        api_key = get_env_var()
+        api_key = get_env_var() # default is openai api key
         layers = parameters[0].values # feature layer (multiple)
         prompt = parameters[1].value  # string
         eval = parameters[2].value  # boolean
-        # if layers:
-        #     derived_context = combine_map_and_layer_info(map_to_json(),get_layer_info(layers))
-        # else:
-        #     derived_context = ""
-        derived_context = parameters[3]
-        # parameters[3].SetParameterAsText(derived_context)
-
+        derived_context = parameters[3].value  # string with multiple lines
+        
         #debug
         # arcpy.AddMessage("api_key: {}".format(api_key))
         # arcpy.AddMessage("feature_layer: {}".format(layers))
@@ -285,7 +278,7 @@ class GenerateAIPythonCode(object):
 
         code_snippet = generate_python(
             api_key,
-            derived_context.value,
+            derived_context,
             prompt.strip(),
         )
 
@@ -307,6 +300,116 @@ class GenerateAIPythonCode(object):
                 )
 
         return
+
+    def postExecute(self, parameters):
+        """This method takes place after outputs are processed and
+        added to the display."""
+        return
+    
+
+
+class ConvertTextToNumeric(object):
+    def __init__(self):
+        """Define the tool (tool name is the name of the class)."""
+        self.label = "Convert Text to Numeric"
+        self.description = "Clean up numbers stored in inconsistent text formats into a numeric field."
+        self.params = arcpy.GetParameterInfo()
+        self.canRunInBackground = False
+
+    def getParameterInfo(self):
+        """Define the tool parameters."""
+        in_layer = arcpy.Parameter(
+            displayName="Input Layer",
+            name="in_layer",
+            datatype="GPFeatureLayer",
+            parameterType="Required",
+            direction="Input",
+        )
+
+        field = arcpy.Parameter(
+            displayName="Field",
+            name="field",
+            datatype="Field",
+            parameterType="Required",
+            direction="Input",
+        )
+
+        # field type must be text
+        # field must be a field in the input layer
+
+        params = [in_layer,field]
+        return params
+
+    def isLicensed(self):
+        """Set whether the tool is licensed to execute."""
+        return True
+
+    def updateParameters(self, parameters):
+        """Modify the values and properties of parameters before internal
+        validation is performed.  This method is called whenever a parameter
+        has been changed."""
+        return
+
+    def updateMessages(self, parameters):
+        """Modify the messages created by internal validation for each tool
+        parameter. This method is called after internal validation."""
+        return
+
+    def execute(self, parameters, messages):
+        # Get the API key from the environment variable
+        api_key = get_env_var() # default is openai api key
+
+        in_layer = parameters[0].values # feature layer
+        field = parameters[1].value  # field
+
+        # infer numeric type
+            # shortint — Short integers (16-bit)
+            # longint — Long integers (32-bit)
+            # bigint — Big integers (64-bit)
+            # float — Single-precision (32-bit) floating point numbers
+            # double — Double-precision (64-bit) floating point numbers
+        
+        # store normalized values in new field like f"{field_name}_{type}"
+
+        '''
+        Population data (2020)
+        Wolfram             GPT-4             GPT-4_longint
+        7.178 million       7,151,502         7,151,502
+        39.5 million        39.24 million     39,240,000
+        5.784 million       5,758,736         5,758,736
+        1.848 million       1,839,106         1,839,106
+        1.961 million       1,961,504         1,961,504
+        3.114 million       3,138,259         3,138,259
+        2.118 million       2,117,522         2,117,522
+        4.242 million       4.2 million       4,200,000
+        29.22 million       29,145,505        29,145,505
+        3.282 million       3,205,958         3,205,958
+        '''
+
+        # Get the API key from the environment variable
+        api_key = get_env_var()  # default is OpenAI API key
+
+        in_layer = parameters[0].valueAsText  # feature layer
+        field = parameters[1].valueAsText  # field
+
+        # Get the field values
+        field_values = []
+        with arcpy.da.SearchCursor(in_layer, [field]) as cursor:
+            for row in cursor:
+                field_values.append(row[0])
+
+        # Convert the entire series using OpenAI API
+        converted_values = self.convert_series_to_numeric(field_values, api_key)
+
+        # Add a new field to store the converted numeric values
+        field_name_new = f"{field}_numeric"
+        arcpy.AddField_management(in_layer, field_name_new, "DOUBLE")
+
+        # Update the new field with the converted values
+        with arcpy.da.UpdateCursor(in_layer, [field, field_name_new]) as cursor:
+            for i, row in enumerate(cursor):
+                row[1] = converted_values[i]
+                cursor.updateRow(row)
 
     def postExecute(self, parameters):
         """This method takes place after outputs are processed and
