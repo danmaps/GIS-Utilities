@@ -110,7 +110,19 @@ class TestSplitMergeDecorator(unittest.TestCase):
             for i in range(8):
                 cursor.insertRow([arcpy.Point(i, i), "string_"+str(i), i])
 
+        # Create a large test feature class
+        self.large = os.path.join(self.workspace, "large")
+        arcpy.management.CreateFeatureclass(self.workspace, "large", "POINT")
+        arcpy.management.AddField(self.large, "TestTField", "TEXT")
+        arcpy.management.AddField(self.large, "TestNField", "LONG")
+
+        # Insert large test data
+        with arcpy.da.InsertCursor(self.large, ["SHAPE@", "TestTField", "TestNField"]) as cursor:
+            for i in range(1000000):
+                cursor.insertRow([arcpy.Point(i, i), "string_"+str(i), i])
+        
         self.output_fc = os.path.join(self.workspace, "test_output_fc")
+        self.large_output_fc = os.path.join(self.workspace, "large_output_fc")
 
     def test_process_feature_class(self):
         @split_merge(num_splits=4, split_field="SplitID")
@@ -165,6 +177,35 @@ class TestSplitMergeDecorator(unittest.TestCase):
                 actual_values.append(row[0])
 
         self.assertListEqual(actual_values, expected_values)
+
+    
+    def test_large(self):
+        # @split_merge(num_splits=2, split_field="SplitID")
+        def calculate_field(in_fc, out_fc):
+            start_time = time.time()
+
+            # Calculate fields
+            arcpy.management.AddField(in_fc, "NewNField", "LONG")
+            arcpy.management.CalculateField(in_fc, "NewNField", "!TestNField! + 1", "PYTHON3")
+            arcpy.CopyFeatures_management(in_fc, out_fc)
+
+            end_time = time.time()
+            elapsed_time = end_time - start_time
+            print(f"Final output {out_fc}")
+            print(f"Total time taken: {elapsed_time:.2f} seconds")
+            
+        # Run the processing function
+        calculate_field(self.large, self.large_output_fc)
+
+        # Verify that the integer values are as expected
+        expected_values = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
+        actual_values = []
+        with arcpy.da.SearchCursor(self.large_output_fc, ["NewNField"], where_clause="NewNField <= 10") as cursor:
+            for row in cursor:
+                actual_values.append(row[0])
+
+        self.assertListEqual(actual_values, expected_values)
+
 
 
     def tearDown(self):
