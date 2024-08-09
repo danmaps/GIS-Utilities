@@ -270,7 +270,7 @@ def convert_series_to_numeric(api_key, field_values):
 
     headers = {"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"}
     data = {
-        "model": "gpt-4o-mini",
+        "model": "gpt-4o-mini", # gpt-4o-2024-08-06
         "messages": prompt,
         "temperature": 0.3,  # be more predictable, less creative
         "max_tokens": 1500,
@@ -321,7 +321,7 @@ def parse_numeric_value(text_value):
 def get_openai_response(api_key, messages):
     headers = {"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"}
     data = {
-        "model": "gpt-4o-mini",
+        "model": "gpt-4o-mini", # gpt-4o-2024-08-06
         "messages": messages,
         "temperature": 0.5,  # be more predictable, less creative
         "max_tokens": 500,
