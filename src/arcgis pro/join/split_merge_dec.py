@@ -29,12 +29,14 @@ def split_merge(num_splits, split_field="SplitID"):
             arcpy.management.CreateFileGDB(temp_dir, "temp.gdb")
             
             # Add a split field if not already present
-            add_split_field(input_fc, split_field, num_splits)
+            records = add_split_field(input_fc, split_field, num_splits)
+                        
             
             # Split the dataset by the attribute values
             # split_tables = split_table_by_attribute(input_fc, temp_gdb, split_field)
             
             arcpy.analysis.SplitByAttributes(input_fc,temp_gdb,[split_field])
+            print(f"There are {num_splits} chunks with ~{records} records each.")
             arcpy.env.workspace = temp_gdb
             split_tables = arcpy.ListFeatureClasses()
             # print(split_tables)
@@ -85,7 +87,8 @@ def add_split_field(input_fc, field_name="SplitID", num_splits=2):
             cursor.updateRow(row)
             count += 1
 
-    print(f"Field {field_name} added to {input_fc}")
+    # print(f"Field {field_name} added to {input_fc}")
+    return records_per_split
 
 # Test class for the decorator
 
@@ -180,7 +183,7 @@ class TestSplitMergeDecorator(unittest.TestCase):
 
     
     def test_large(self):
-        # @split_merge(num_splits=2, split_field="SplitID")
+        @split_merge(num_splits=2, split_field="SplitID")
         def calculate_field(in_fc, out_fc):
             start_time = time.time()
 
@@ -191,8 +194,8 @@ class TestSplitMergeDecorator(unittest.TestCase):
 
             end_time = time.time()
             elapsed_time = end_time - start_time
-            print(f"Final output {out_fc}")
-            print(f"Total time taken: {elapsed_time:.2f} seconds")
+            print(f"Output {out_fc}")
+            print(f"Time taken: {elapsed_time:.2f} seconds")
             
         # Run the processing function
         calculate_field(self.large, self.large_output_fc)
