@@ -4,6 +4,9 @@ import logging
 from projCreator_utils import create_project
 from textwrap import dedent
 
+# arcgis pro python path
+arcgispro_py3 = r"C:\Program Files\ArcGIS\Pro\bin\Python\envs\arcgispro-py3\python.exe"
+
 # Set up logging
 logging.basicConfig(
     filename="error_log.txt",

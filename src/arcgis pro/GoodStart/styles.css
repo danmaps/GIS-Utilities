@@ -1,0 +1,28 @@
+/* styles.css */
+
+#header {
+    color: white;
+    background: darkblue;
+    padding: 1;
+    text-align: center;
+}
+
+#project_name, #folder {
+    margin-bottom: 1;
+}
+
+#datasets {
+    margin-bottom: 1;
+}
+
+#submit {
+    background: green;
+    color: white;
+    padding: 1;
+    margin-top: 2;
+}
+
+#status {
+    color: yellow;
+    margin-top: 2;
+}
