@@ -235,6 +235,7 @@ class TestSplitMergeDecorator(unittest.TestCase):
     def tearDown(self):
         # Clean up test environment
         arcpy.management.Delete(self.input_fc)
+        arcpy.management.Delete(self.large)
         arcpy.management.Delete(self.output_fc)
 
 
