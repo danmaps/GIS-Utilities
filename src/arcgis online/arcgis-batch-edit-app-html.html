@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ArcGIS Batch Edit App</title>
+    <link rel="stylesheet" href="https://js.arcgis.com/4.24/esri/themes/light/main.css">
+    <script src="https://js.arcgis.com/4.24/"></script>
+    <style>
+        html, body, #viewDiv {
+            padding: 0;
+            margin: 0;
+            height: 100%;
+            width: 100%;
+        }
+        #editPanel {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            padding: 20px;
+            background-color: white;
+            box-shadow: 0 1px 4px rgba(0,0,0,0.8);
+            z-index: 1;
+        }
+    </style>
+</head>
+<body>
+    <div id="viewDiv"></div>
+    <div id="editPanel">
+        <h3>Batch Attribute Editor</h3>
+        <button id="loginBtn">Login to ArcGIS Online</button>
+        <br><br>
+        <select id="fieldSelect">
+            <option value="">Select field to edit</option>
+        </select>
+        <br><br>
+        <input type="text" id="newValue" placeholder="Enter new value">
+        <br><br>
+        <button id="updateBtn">Update Attributes</button>
+        <p id="selectedCount">Selected Features: 0</p>
+    </div>
+
+    <script>
+        require([
+            "esri/Map",
+            "esri/views/MapView",
+            "esri/layers/FeatureLayer",
+            "esri/widgets/Sketch",
+            "esri/identity/OAuthInfo",
+            "esri/identity/IdentityManager"
+        ], function(Map, MapView, FeatureLayer, Sketch, OAuthInfo, esriId) {
+            const map = new Map({
+                basemap: "topo-vector"
+            });
+
+            const view = new MapView({
+                container: "viewDiv",
+                map: map,
+                center: [-118.80543, 34.02700],
+                zoom: 13
+            });
+
+            const featureLayer = new FeatureLayer({
+                url: "https://services3.arcgis.com/GVgbJbqm8hXASVYi/arcgis/rest/services/Trails/FeatureServer/0"
+            });
+
+            map.add(featureLayer);
+
+            const sketch = new Sketch({
+                layer: featureLayer,
+                view: view,
+                creationMode: "update"
+            });
+
+            view.ui.add(sketch, "top-right");
+
+            let selectedFeatures = [];
+
+            sketch.on("update", function(event) {
+                if (event.state === "complete") {
+                    selectedFeatures = event.graphics;
+                    document.getElementById("selectedCount").textContent = `Selected Features: ${selectedFeatures.length}`;
+                }
+            });
+
+            featureLayer.when(() => {
+                const select = document.getElementById("fieldSelect");
+                featureLayer.fields.forEach(field => {
+                    const option = document.createElement("option");
+                    option.value = field.name;
+                    option.textContent = field.name;
+                    select.appendChild(option);
+                });
+            });
+
+            document.getElementById("loginBtn").addEventListener("click", function() {
+                const info = new OAuthInfo({
+                    appId: "YOUR_APP_ID",
+                    popup: false
+                });
+
+                esriId.registerOAuthInfos([info]);
+
+                esriId.checkSignInStatus(info.portalUrl + "/sharing")
+                    .then(() => {
+                        console.log("User is signed in.");
+                    }).catch(() => {
+                        esriId.getCredential(info.portalUrl + "/sharing");
+                    });
+            });
+
+            document.getElementById("updateBtn").addEventListener("click", function() {
+                const field = document.getElementById("fieldSelect").value;
+                const newValue = document.getElementById("newValue").value;
+
+                if (!field || !newValue || selectedFeatures.length === 0) {
+                    alert("Please select a field, enter a value, and select features");
+                    return;
+                }
+
+                const edits = {
+                    updateFeatures: selectedFeatures.map(feature => ({
+                        attributes: {
+                            [field]: newValue,
+                            OBJECTID: feature.attributes.OBJECTID
+                        }
+                    }))
+                };
+
+                featureLayer.applyEdits(edits).then(results => {
+                    if (results.updateFeatureResults.length > 0) {
+                        alert("Attributes updated successfully");
+                        selectedFeatures = [];
+                        document.getElementById("selectedCount").textContent = "Selected Features: 0";
+                        sketch.cancel();
+                    } else {
+                        alert("Failed to update attributes");
+                    }
+                }).catch(error => {
+                    alert("Error updating attributes: " + error.message);
+                });
+            });
+        });
+    </script>
+</body>
+</html>
