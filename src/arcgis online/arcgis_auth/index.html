@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>OAuth Test with Turf.js</title>
+    
+    <!-- ArcGIS API for JavaScript CSS -->
+    <link rel="stylesheet" href="https://js.arcgis.com/4.25/esri/themes/light/main.css">
+    
+    <!-- Leaflet CSS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="" />
+    
+    <!-- ArcGIS API for JavaScript -->
+    <script src="https://js.arcgis.com/4.25/"></script>
+    
+    <!-- Leaflet JS -->
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
+    
+    <!-- Esri Leaflet from CDN -->
+    <script src="https://unpkg.com/esri-leaflet@3.0.12/dist/esri-leaflet.js"></script>
+    
+    <!-- Esri Leaflet Vector from CDN -->
+    <script src="https://unpkg.com/esri-leaflet-vector@4.2.4/dist/esri-leaflet-vector.js" crossorigin=""></script>
+    
+    <!-- Turf.js -->
+    <script src="https://unpkg.com/@turf/turf@5.1.6/turf.min.js"></script>
+    
+    <style>
+        html, body {
+            padding: 0;
+            margin: 0;
+            height: 100%;
+            width: 100%;
+            font-family: Arial, Helvetica, sans-serif;
+            font-size: 14px;
+            color: #323232;
+        }
+        
+        #map {
+            height: 80vh; /* Adjust the height of the map */
+            width: 100%;
+        }
+        
+        #info-pane {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            z-index: 1000;
+            padding: 1em;
+            background: white;
+            max-width: 150px;
+        }
+    </style>
+</head>
+<body>
+    
+    <button id="loginArcGISBtn" style="display:none;">Login with ArcGIS Online</button>
+    <button id="logoutBtn" style="display:none;">Logout</button>
+    <p id="userMessage">Not logged in</p>
+    
+    <!-- Map and Information Pane -->
+    <div id="map"></div>
+    <div id="info-pane" class="leaflet-bar">
+        <label>Census block points that intersect both bounding boxes are red.</label>
+    </div>
+    
+    <!-- Main OAuth and Turf Intersect Scripts -->
+    <script src="main.js"></script>
+    <script src="turf_intersect.js"></script>
+</body>
+</html>
