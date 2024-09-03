@@ -1,7 +1,6 @@
-
-document.addEventListener('DOMContentLoaded', function() {
-// Retrieve the existing token from localStorage
-const accessToken = localStorage.getItem("esri_auth_token");
+document.addEventListener('DOMContentLoaded', function () {
+    // Retrieve the existing token from localStorage
+    const accessToken = localStorage.getItem("esri_auth_token");
 
     console.log("token found!", accessToken);
     // Define the GeoJSON bounding boxes

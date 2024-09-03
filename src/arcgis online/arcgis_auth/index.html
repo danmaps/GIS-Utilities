@@ -6,13 +6,13 @@
     <title>OAuth Test with Turf.js</title>
     
     <!-- ArcGIS API for JavaScript CSS -->
-    <link rel="stylesheet" href="https://js.arcgis.com/4.25/esri/themes/light/main.css">
+    <link rel="stylesheet" href="https://js.arcgis.com/4.30/esri/themes/light/main.css">
     
     <!-- Leaflet CSS -->
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="" />
     
     <!-- ArcGIS API for JavaScript -->
-    <script src="https://js.arcgis.com/4.25/"></script>
+    <script src="https://js.arcgis.com/4.30/"></script>
     
     <!-- Leaflet JS -->
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
@@ -58,15 +58,14 @@
     <button id="loginArcGISBtn" style="display:none;">Login with ArcGIS Online</button>
     <button id="logoutBtn" style="display:none;">Logout</button>
     <p id="userMessage">Not logged in</p>
+
+    <div id="items"></div>
     
     <!-- Map and Information Pane -->
     <div id="map"></div>
-    <div id="info-pane" class="leaflet-bar">
-        <label>Census block points that intersect both bounding boxes are red.</label>
-    </div>
     
     <!-- Main OAuth and Turf Intersect Scripts -->
     <script src="main.js"></script>
-    <script src="turf_intersect.js"></script>
+    <!-- <script src="turf_intersect.js"></script> -->
 </body>
 </html>
