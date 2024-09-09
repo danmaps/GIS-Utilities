@@ -162,3 +162,4 @@ data simulator/installing.md
 data quality control/ModelBuilder/*
 *pyt.xml
 .vscode/settings.json
+src/arcgis pro/geojson*

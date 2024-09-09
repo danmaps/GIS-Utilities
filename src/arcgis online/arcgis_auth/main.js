@@ -4,11 +4,13 @@ const redirectUri = 'http://127.0.0.1:5500/index.html'; // Your redirect URI
 // Check if the authorization code is present in the URL
 const urlParams = new URLSearchParams(window.location.search);
 const arcgisAuthCode = urlParams.get('code');
+
 document.addEventListener('DOMContentLoaded', function () {
+    // Load the required modules using AMD for ArcGIS
     require([
         "esri/identity/OAuthInfo",
         "esri/identity/IdentityManager",
-        "esri/portal/Portal",
+        "esri/portal/Portal"
     ], function(OAuthInfo, IdentityManager, Portal) {
 
         // Initialize portal info but do not login immediately
@@ -29,6 +31,10 @@ document.addEventListener('DOMContentLoaded', function () {
                 document.getElementById("logoutBtn").style.display = "inline";
                 // Store token in localStorage for future use
                 localStorage.setItem("esri_auth_token", credential.token);
+                // Store credential object in localStorage
+                localStorage.setItem("esri_credential", JSON.stringify(credential));
+                // Fetch and display user's feature services
+                fetchUserFeatureServices();
             })
             .catch(function() {
                 // User is not logged in, show the login button
@@ -58,6 +64,8 @@ document.addEventListener('DOMContentLoaded', function () {
                     localStorage.setItem("esri_auth_token", credential.token);
                     // Clean up the URL by removing the authorization code
                     history.replaceState({}, document.title, redirectUri);
+                    // Fetch and display user's feature services
+                    fetchUserFeatureServices();
                 }).catch(function(error) {
                     console.error("Error during ArcGIS OAuth: ", error);
                     document.getElementById("userMessage").innerText = `ArcGIS Login failed. Please try again.`;
@@ -77,9 +85,45 @@ document.addEventListener('DOMContentLoaded', function () {
         // Attach logout function to the logout button
         document.getElementById("logoutBtn").addEventListener("click", handleLogout);
 
+        // Initialize the Leaflet map
+        const map = L.map("map").setView([37.837, -122.479], 8);
 
+        // Fetch and display user's feature services
+        function fetchUserFeatureServices() {
+            const portal = new Portal();
+            portal.load().then(function() {
+                const user = portal.user;
+                console.log("user: ", user);
+                if (user) {
+                    user.fetchItems({ num: 100 }).then(function(response) {
+                        const items = response.results;
+                        const itemsList = document.getElementById("itemsList");
 
+                        items.forEach(function(item) {
+                            // Only include feature services
+                            if (item.type === "Feature Service") {
+                                const listItem = document.createElement("li");
+                                listItem.textContent = item.title;
+                                listItem.setAttribute("data-url", item.url);
+                                listItem.style.cursor = "pointer";
+                                listItem.addEventListener("click", function() {
+                                    addFeatureServiceToMap(item.url);
+                                });
+                                itemsList.appendChild(listItem);
+                            }
+                        });
+                    });
+                } else {
+                    console.error("No user found in the portal.");
+                }
+            });
+        }
+
+        // Function to add a feature service to the Leaflet map
+        function addFeatureServiceToMap(url) {
+            L.esri.featureLayer({
+                url: url
+            }).addTo(map);
+        }
     });
-
-
 });
