@@ -198,7 +198,7 @@ def script_tool(param0, param1):
     validate_and_calculate_field("bulktrans_districts", "CIRCUIT_SE", "!CIRCUIT_NAME!.upper()+'_'+!SEGMENTS!")
     validate_and_calculate_field("bulktrans_districts", "WIRE_CLASS", '"Transmission"')
     validate_and_calculate_field("bulktrans_districts", "SUBSTATION", "!CIRCUIT_NAME!.split('-')[0].upper()")
-    arcpy.AddMessage([f.name for f in arcpy.ListFields("subtrans_districts")]) # debug
+    # arcpy.AddMessage([f.name for f in arcpy.ListFields("subtrans_districts")]) # debug
     validate_and_calculate_field("subtrans_districts", "CIRCUIT_ID", "'ET-'+!CIRCUIT_NO!.split('-')[0]")  # 00158-BT -> ET-00158
     validate_and_calculate_field("subtrans_districts", "CIRCUIT_SE", "!CIRCUIT_NAME!.upper()+'_'+!SEGMENTS!")
     validate_and_calculate_field("subtrans_districts", "WIRE_CLASS", '"Transmission"')

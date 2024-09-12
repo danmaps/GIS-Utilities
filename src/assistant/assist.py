@@ -321,7 +321,7 @@ def parse_numeric_value(text_value):
 def get_openai_response(api_key, messages):
     headers = {"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"}
     data = {
-        "model": "gpt-4o-mini", # gpt-4o-2024-08-06
+        "model": "o1-preview", # gpt-4o-2024-08-06
         "messages": messages,
         "temperature": 0.5,  # be more predictable, less creative
         "max_tokens": 500,
@@ -480,7 +480,7 @@ def get_layer_info(input_layers):
 
 
 def get_env_var(var_name="OPENAI_API_KEY"):
-    arcpy.AddMessage(f"Fetching API key from {var_name} environment variable.")
+    # arcpy.AddMessage(f"Fetching API key from {var_name} environment variable.")
     return os.environ.get(var_name, "")
 
 
