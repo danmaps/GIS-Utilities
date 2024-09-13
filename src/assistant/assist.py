@@ -321,7 +321,7 @@ def parse_numeric_value(text_value):
 def get_openai_response(api_key, messages):
     headers = {"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"}
     data = {
-        "model": "o1-preview", # gpt-4o-2024-08-06
+        "model": "gpt-4o-mini",
         "messages": messages,
         "temperature": 0.5,  # be more predictable, less creative
         "max_tokens": 500,
@@ -337,6 +337,7 @@ def get_openai_response(api_key, messages):
                 verify=False,
             )
             response.raise_for_status()
+            arcpy.AddMessage(f"Returning response from {data['model']}")
             return response.json()["choices"][0]["message"]["content"].strip()
         except requests.exceptions.RequestException as e:
             arcpy.AddWarning(f"Retrying openai response generation due to: {e}")
@@ -480,7 +481,7 @@ def get_layer_info(input_layers):
 
 
 def get_env_var(var_name="OPENAI_API_KEY"):
-    # arcpy.AddMessage(f"Fetching API key from {var_name} environment variable.")
+    arcpy.AddMessage(f"Fetching API key from {var_name} environment variable.")
     return os.environ.get(var_name, "")
 
 
