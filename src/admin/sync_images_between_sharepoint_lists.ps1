@@ -13,9 +13,7 @@ if (!(Test-Path $downloadPath)) {
 }
 
 # open the download folder in windows file explorer
-Start-Process $downloadPath
-
-
+# Start-Process $downloadPath
 
 # Define the origin SharePoint site URL and list name
 $siteUrl = "https://edisonintl.sharepoint.com/sites/GeospatialAnalysis-TD/"
@@ -25,10 +23,13 @@ $listName = "8e4e8acd-07fc-4e95-9573-b07fa8312d56" # DamageAssessmentSurvey
 Connect-PnPOnline -Url $siteUrl -UseWebLogin
 
 # Get the list items
-$listItems = Get-PnPListItem -List $listName -Fields "Title"
+$listItems = Get-PnPListItem -List $listName -Fields "Modified"
+
+# narrow it down to only items that have been modified within the last hour
+$listItemsModifiedWithinLastHour = $listItems | Where-Object { $_.LastModified -gt (Get-Date).AddHours(-1) }
 
 # Loop through each item to get the attachments
-foreach ($item in $listItems) {
+foreach ($item in $listItemsModifiedWithinLastHour) {
     $itemID = $item["ID"]
 
     # Get and download the attachments for the list item
@@ -41,7 +42,7 @@ foreach ($item in $listItems) {
         $newFileName = "ID_$itemID-$($attachment.Name)"
         Rename-Item -Path $attachment.FullName -NewName $newFileName
 
-        Write-Host "Renamed $($attachment.Name) to $newFileName"
+        # Write-Host "Renamed $($attachment.Name) to $newFileName"
     }
 }
 
@@ -52,52 +53,55 @@ foreach ($item in $listItems) {
 # for each image in the Images directory, copy it to the sharepoint list defined in toList
 
 # Define the destination SharePoint site URL and list name
-# $siteUrl = "https://edisonintl.sharepoint.com/sites/TD/org"
-# $listName = "Damage Assessment Survey Questions"
+ $siteUrl = "https://edisonintl.sharepoint.com/sites/TD/org"
+ $listName = "Damage Assessment Survey Questions"
+
+ # Connect to SharePoint Online using current Windows credentials
+Connect-PnPOnline -Url $siteUrl -UseWebLogin
+
+# Get the list items
+$listItems = Get-PnPListItem -List $listName -Fields "TrackingID ID"
 
 # Get the list items
 $listItems = Get-PnPListItem -List $listName
 # Loop through each item to add the correct attachment by ID_Number
+
 foreach ($item in $listItems) {
     $itemID = $item["ID"]
+    $trackingID = $item["TrackingID"]
 
-    # https://edisonintl.sharepoint.com/sites/GeospatialAnalysis-TD/Lists/DamageAssessmentSurvey/DispForm.aspx?ID=50&e=v57upI
+    # Find the matching images in the download folder using the TrackingID
+    $matchingImages = Get-ChildItem -Path $downloadPath | Where-Object { $_.Name -like "ID_$trackingID*" }
+    
+    if ($matchingImages.Count -eq 0) {
+        Write-Host "No matching images found for TrackingID $trackingID"
+    } else {
+        foreach ($image in $matchingImages) {
+            # Write-Host "Found matching image: $($image.Name) for TrackingID $trackingID"
 
-    # see if there's a corresponding image in the Images folder that matches the ID
-    $OANImages = Get-ChildItem -Path $downloadPath | Where-Object { $_.Name -like "ID_$itemID*" }
-    Write-Host "Found $($OANImage.Name)"
+            # Prepare the short name for uploading (if you need to modify the name)
+            $shortName = $image.Name -replace "$trackingID", ""
 
-    # Try to add any matching images to the corresponding list item
-    foreach ($OANImage in $OANImages) {
-        
-        Write-Host "Attempting to add $($itemID) to the list"
-        
-        # Remove the ID_ prefix from the image name
-        $shortName = $OANImage.Name -replace "ID_$($itemID)-", ""
+            # Further shorten the name to only the last 10 characters (excluding the extension)
+            $extension = $image.Extension  # Extract the extension
+            $baseName = [System.IO.Path]::GetFileNameWithoutExtension($shortName)  # Get the base name without extension
 
-        # Further shorten the name to only the last 10 characters (excluding the extension)
-        $extension = $OANImage.Extension  # Extract the extension
-        $baseName = [System.IO.Path]::GetFileNameWithoutExtension($shortName)  # Get the base name without extension
+            # If the base name is longer than 10 characters, slice it to the last 10
+            if ($baseName.Length -gt 10) {
+                $baseName = $baseName.Substring($baseName.Length - 10)
+            }
 
-        # If the base name is longer than 10 characters, slice it to the last 10
-        if ($baseName.Length -gt 10) {
-            $baseName = $baseName.Substring($baseName.Length - 10)
-        }
+            # Recombine the shortened base name with the extension
+            $shortName = "$baseName$extension"
 
-        # Recombine the shortened base name with the extension
-        $shortName = "$baseName$extension"
-
-        try {
-            
-            # Attempt to add the attachment
-            # Add-PnPListItemAttachment [-List] <ListPipeBind> [-Identity] <ListItemPipeBind> [-Path <String>] [-NewFileName <String>] [-Connection <PnPConnection>] 
-
-            Add-PnPListItemAttachment -List $listName -Identity $itemID -Path $OANImage.FullName -NewFileName $shortName
-            Write-Host "Successfully added attachment $shortName for item $itemID"
-        }
-        catch {
-            # Handle the error
-            Write-Host "Failed to add attachment for item $itemID. Error: $_"
+            try {
+                # Use the itemID for uploading the attachment
+                Add-PnPListItemAttachment -Path $image.FullName -List $listName -Identity $itemID -FileName $shortName
+                Write-Host "Successfully added attachment $shortName for item $itemID (TrackingID: $trackingID)"
+            }
+            catch {
+                Write-Host "Failed to add attachment for item $itemID (TrackingID: $trackingID). Error: $_"
+            }
         }
     }
 }
