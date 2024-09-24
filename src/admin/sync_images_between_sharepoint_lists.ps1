@@ -30,6 +30,13 @@ $listItems = Get-PnPListItem -List $listName -Fields "Modified"
 
 $listItemsModifiedWithinLastHour = $listItems | Where-Object { $_["Modified"] -gt (Get-Date).AddHours(-1) }
 # $listItemsModifiedWithinLastHour = $listItems | Where-Object { $_.LastModified -gt (Get-Date).AddHours(-1) }
+# Output the filtered list
+$listItemsModifiedWithinLastHour | ForEach-Object {
+    Write-Host "Item ID: $($_['ID']), Modified: $($_['Modified'])"
+}
+
+# print the number of items that have been modified within the last hour
+Write-Host "Number of items modified within the last hour: $($listItemsModifiedWithinLastHour.Count)"
 
 # Loop through each item to get the attachments
 foreach ($item in $listItemsModifiedWithinLastHour) {
@@ -52,14 +59,13 @@ foreach ($item in $listItemsModifiedWithinLastHour) {
 # stop here for debugging
 # exit
 
-
 # for each image in the Images directory, copy it to the sharepoint list defined in toList
 
 # Define the destination SharePoint site URL and list name
- $siteUrl = "https://edisonintl.sharepoint.com/sites/TD/org"
- $listName = "Damage Assessment Survey Questions"
+$siteUrl = "https://edisonintl.sharepoint.com/sites/TD/org"
+$listName = "Damage Assessment Survey Questions"
 
- # Connect to SharePoint Online using current Windows credentials
+# Connect to SharePoint Online using current Windows credentials
 Connect-PnPOnline -Url $siteUrl -UseWebLogin
 
 # Get the list items
@@ -67,8 +73,11 @@ $listItems = Get-PnPListItem -List $listName -Fields "TrackingID ID"
 
 # Get the list items
 $listItems = Get-PnPListItem -List $listName
-# Loop through each item to add the correct attachment by ID_Number
 
+# create a counter
+$count = 0
+
+# Loop through each item to add the correct attachment by ID_Number
 foreach ($item in $listItems) {
     $itemID = $item["ID"]
     $trackingID = $item["TrackingID"]
@@ -84,7 +93,6 @@ foreach ($item in $listItems) {
 
             # Prepare the short name for uploading (if you need to modify the name)
             $shortName = $image.Name -replace "ID_$($trackingID)-", ""
-
 
             # Further shorten the name to only the last 10 characters (excluding the extension)
             $extension = $image.Extension  # Extract the extension
@@ -108,6 +116,8 @@ foreach ($item in $listItems) {
             }
         }
     }
+
+    $count++
 }
 
 # delete the temporary download folder
@@ -116,4 +126,4 @@ Remove-Item -Path $downloadPath -Recurse
 # only sync attachments for changed list items
 #   if this process is meant to be run hourly, just look at what has been updated in the last hour
 
-Write-Host "Done"
+Write-Host "Number of items processed: $count"
