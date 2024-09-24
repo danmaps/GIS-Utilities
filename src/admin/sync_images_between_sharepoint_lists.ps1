@@ -26,7 +26,10 @@ Connect-PnPOnline -Url $siteUrl -UseWebLogin
 $listItems = Get-PnPListItem -List $listName -Fields "Modified"
 
 # narrow it down to only items that have been modified within the last hour
-$listItemsModifiedWithinLastHour = $listItems | Where-Object { $_.LastModified -gt (Get-Date).AddHours(-1) }
+# use the value in the Modified field
+
+$listItemsModifiedWithinLastHour = $listItems | Where-Object { $_["Modified"] -gt (Get-Date).AddHours(-1) }
+# $listItemsModifiedWithinLastHour = $listItems | Where-Object { $_.LastModified -gt (Get-Date).AddHours(-1) }
 
 # Loop through each item to get the attachments
 foreach ($item in $listItemsModifiedWithinLastHour) {
@@ -80,23 +83,24 @@ foreach ($item in $listItems) {
             # Write-Host "Found matching image: $($image.Name) for TrackingID $trackingID"
 
             # Prepare the short name for uploading (if you need to modify the name)
-            $shortName = $image.Name -replace "$trackingID", ""
+            $shortName = $image.Name -replace "ID_$($trackingID)-", ""
+
 
             # Further shorten the name to only the last 10 characters (excluding the extension)
             $extension = $image.Extension  # Extract the extension
             $baseName = [System.IO.Path]::GetFileNameWithoutExtension($shortName)  # Get the base name without extension
 
             # If the base name is longer than 10 characters, slice it to the last 10
-            if ($baseName.Length -gt 10) {
-                $baseName = $baseName.Substring($baseName.Length - 10)
-            }
+            # if ($baseName.Length -gt 10) {
+            #     $baseName = $baseName.Substring($baseName.Length - 10)
+            # }
 
             # Recombine the shortened base name with the extension
             $shortName = "$baseName$extension"
 
             try {
                 # Use the itemID for uploading the attachment
-                Add-PnPListItemAttachment -Path $image.FullName -List $listName -Identity $itemID -FileName $shortName
+                Add-PnPListItemAttachment -Path $image.FullName -List $listName -Identity $itemID -NewFileName $shortName
                 Write-Host "Successfully added attachment $shortName for item $itemID (TrackingID: $trackingID)"
             }
             catch {
@@ -112,3 +116,4 @@ Remove-Item -Path $downloadPath -Recurse
 # only sync attachments for changed list items
 #   if this process is meant to be run hourly, just look at what has been updated in the last hour
 
+Write-Host "Done"
