@@ -13,7 +13,9 @@ if (!(Test-Path $downloadPath)) {
 }
 
 # open the download folder in windows file explorer
-# Start-Process $downloadPath
+Start-Process $downloadPath
+
+
 
 # Define the origin SharePoint site URL and list name
 $siteUrl = "https://edisonintl.sharepoint.com/sites/GeospatialAnalysis-TD/"
@@ -42,13 +44,16 @@ foreach ($item in $listItems) {
         Write-Host "Renamed $($attachment.Name) to $newFileName"
     }
 }
+
+# stop here for debugging
+# exit
+
+
 # for each image in the Images directory, copy it to the sharepoint list defined in toList
 
 # Define the destination SharePoint site URL and list name
 # $siteUrl = "https://edisonintl.sharepoint.com/sites/TD/org"
 # $listName = "Damage Assessment Survey Questions"
-
-# for proof of concept, just copy the images to the rows of the origin list
 
 # Get the list items
 $listItems = Get-PnPListItem -List $listName
@@ -63,8 +68,6 @@ foreach ($item in $listItems) {
     Write-Host "Found $($OANImage.Name)"
 
     # Try to add any matching images to the corresponding list item
-
-
     foreach ($OANImage in $OANImages) {
         
         Write-Host "Attempting to add $($itemID) to the list"
@@ -87,7 +90,9 @@ foreach ($item in $listItems) {
         try {
             
             # Attempt to add the attachment
-            Add-PnPListItemAttachment -Path $OANImage.FullName -List $listName -Identity $itemID -FileName $shortName
+            # Add-PnPListItemAttachment [-List] <ListPipeBind> [-Identity] <ListItemPipeBind> [-Path <String>] [-NewFileName <String>] [-Connection <PnPConnection>] 
+
+            Add-PnPListItemAttachment -List $listName -Identity $itemID -Path $OANImage.FullName -NewFileName $shortName
             Write-Host "Successfully added attachment $shortName for item $itemID"
         }
         catch {
