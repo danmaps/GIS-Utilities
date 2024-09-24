@@ -1,4 +1,7 @@
 from assist import *
+from importlib import reload
+import assist
+reload(assist)
 
 class Toolbox:
     def __init__(self):

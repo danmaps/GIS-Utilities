@@ -481,7 +481,7 @@ def get_layer_info(input_layers):
 
 
 def get_env_var(var_name="OPENAI_API_KEY"):
-    arcpy.AddMessage(f"Fetching API key from {var_name} environment variable.")
+    # arcpy.AddMessage(f"Fetching API key from {var_name} environment variable.")
     return os.environ.get(var_name, "")
 
 
