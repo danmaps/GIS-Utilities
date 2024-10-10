@@ -21,10 +21,10 @@ The name or ID of the destination SharePoint list.
 (Optional) The path to the folder where attachments will be downloaded. Default is "$env:TEMP\sharepoint_attachments".
 
 .PARAMETER CleanUp
-(Optional) Switch to indicate if the download folder should be deleted after execution. Default is $true.
+(Optional) Switch to indicate if the download folder should be deleted after execution. Default is $False.
 
 .PARAMETER UseWebLogin
-(Optional) Switch to use web login for authentication. Default is $true.
+(Optional) Switch to use web login for authentication. Default is $False.
 
 .EXAMPLE
 .\Sync-Attachments.ps1 -SourceSiteUrl "https://source.sharepoint.com" -SourceListName "SourceList" -DestinationSiteUrl "https://destination.sharepoint.com" -DestinationListName "DestinationList"
@@ -48,7 +48,7 @@ param(
 
     [string]$DownloadPath = "$env:TEMP\sharepoint_attachments",
 
-    [switch]$CleanUp = $False,
+    [switch]$SkipCleanUp = $False,
 
     [switch]$UseWebLogin = $False
 )
@@ -187,7 +187,7 @@ foreach ($item in $destinationItems) {
 # Upload attachments to the destination list
 Add-Attachments -ListName $DestinationListName -DownloadPath $DownloadPath -DestinationItemsHash $destinationItemsHash
 
-# Clean up the download folder if specified
-if ($CleanUp) {
+# Clean up the download folder if skip cleanup is not specified
+if (!$SkipCleanUp) {
     Remove-Item -Path $DownloadPath -Recurse -Force
 }
