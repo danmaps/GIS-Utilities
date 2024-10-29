@@ -163,3 +163,4 @@ data quality control/ModelBuilder/*
 *pyt.xml
 .vscode/settings.json
 src/arcgis pro/geojson*
+src/arcgis pro/sas/sas_env/
