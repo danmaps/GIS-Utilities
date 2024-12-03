@@ -18,6 +18,7 @@ import datetime
 import zipfile
 import os
 import shutil
+import time
 
 def explode_shapefile(input_shp, output_folder, today_date):
     """Explodes a shapefile with polygons into separate shapefiles based on 'WorkOrder' attribute"""
@@ -55,7 +56,8 @@ def explode_shapefile(input_shp, output_folder, today_date):
                     for f in os.listdir(os.path.join(output_folder)):
                         # print(f,work_order)
                         if os.path.isfile(os.path.join(output_folder, f)) and work_order in f:
-                            all_files.append(f)
+                            if not f.endswith(".sr.lock"): 
+                                all_files.append(f)
                     # print(all_files)
                     zip_file = zipfile.ZipFile(zip_name, "w")
                     for file in all_files:
@@ -98,13 +100,16 @@ if os.path.exists(count_file):
             os.mkdir(os.path.join(onedrive_folder,out_name))
             
         arcpy.management.CopyFeatures(service_item.url+r"/0", os.path.join(onedrive_folder,out_name,out_name) + ".shp")
-
+        
         # Zip shapefile folder
         zip_name = os.path.join(onedrive_folder,out_name,f"WorkOrders_{today_date}.zip")
         all_files = [f for f in os.listdir(os.path.join(onedrive_folder,out_name))
-                     if os.path.isfile(os.path.join(onedrive_folder,out_name, f))]
+                     if os.path.isfile(os.path.join(onedrive_folder,out_name, f))
+                     and not f.endswith(".sr.lock")]
         zip_file = zipfile.ZipFile(zip_name, "w")
         for file in all_files:
+            print(file)
+            
             zip_file.write(os.path.join(onedrive_folder,out_name, file), arcname=file)
         zip_file.close()
 
