@@ -108,7 +108,7 @@ if os.path.exists(count_file):
                      and not f.endswith(".sr.lock")]
         zip_file = zipfile.ZipFile(zip_name, "w")
         for file in all_files:
-            print(file)
+            # print(file)
             
             zip_file.write(os.path.join(onedrive_folder,out_name, file), arcname=file)
         zip_file.close()
