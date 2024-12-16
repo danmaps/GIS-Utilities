@@ -127,6 +127,7 @@ venv/
 ENV/
 env.bak/
 venv.bak/
+*_env/
 
 # Spyder project settings
 .spyderproject
@@ -164,3 +165,4 @@ data quality control/ModelBuilder/*
 .vscode/settings.json
 src/arcgis pro/geojson*
 src/arcgis pro/sas/sas_env/
+src/PoleSight_AI/polesight_env/Scripts/f2py.exe
