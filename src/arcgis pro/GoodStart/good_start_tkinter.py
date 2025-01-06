@@ -45,7 +45,7 @@ class ProjectCreatorApp(tk.Tk):
         folder_dropdown = ttk.Combobox(
             folder_frame,
             textvariable=self.folder_var,
-            values=[r"c:\temp","2024Proj","MPO_Projects","Special_Projects","Data_Requests"],
+            values=[r"c:\temp","2025Proj","MPO_Projects","Special_Projects","Data_Requests"],
         )
         folder_dropdown.pack(side="left", padx=5)
 
