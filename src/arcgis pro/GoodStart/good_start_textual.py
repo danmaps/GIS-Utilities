@@ -9,7 +9,7 @@ class ProjectCreatorApp(App):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
         self.target_folders = [
-            r"c:\temp", "2024Proj", "MPO_Projects", 
+            r"c:\temp", "2025Proj", "MPO_Projects", 
             "Special_Projects", "Data_Requests"
         ]
         self.current_target_folder = self.target_folders[0]
