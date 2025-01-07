@@ -12,7 +12,15 @@ import warnings
 import os
 from owslib.wms import WebMapService
 import rasterio
-from datetime import datetime
+# from datetime import datetime
+
+import matplotlib.pyplot as plt
+import matplotlib.patches as patches
+import rasterio
+from rasterio.warp import calculate_default_transform, reproject, Resampling
+
+from tms2geotiff import download_extent, save_image_auto
+import tempfile
 
 # Enable GDAL exceptions
 gdal.UseExceptions()
@@ -143,7 +151,173 @@ def download_esri_geotiff(bounds, size=(2048, 2048), output_path="high_res_exten
     else:
         raise Exception(f"Failed to download GeoTIFF. Status: {response.status_code}")
 
-# Trigger GeoTIFF download and display
+def tms_download(bounds, zoom=17, output_path="high_res_extent.tif"):
+    """
+    Wrapper around tms2geotiff.download_extent to fetch a georeferenced GeoTIFF.
+    
+    '''
+    ### **Summary of Options**
+    | Provider             | Tile URL Format                                                                                     | Notes                          |
+    |-----------------------|----------------------------------------------------------------------------------------------------|--------------------------------|
+    | **Esri World Imagery** | `https://services.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}` | No API key required, public.   |
+    | **Google Satellite**  | `https://mt1.google.com/vt/lyrs=s&x={x}&y={y}&z={z}`                                               | Requires API compliance.       |
+    | **Bing Maps**         | `http://ecn.t3.tiles.virtualearth.net/tiles/a{q}.jpeg?g=1&key=YOUR_BING_API_KEY`                   | Free API key required.         |
+    | **Sentinel Hub**      | Requires configuration with their WMS server.                                                     | Medium-resolution imagery.     |
+    | **Mapbox Satellite**  | `https://api.mapbox.com/v4/mapbox.satellite/{z}/{x}/{y}.jpg90?access_token=YOUR_MAPBOX_API_KEY`    | High-quality, free tier limit. |
+    '''
+
+    Args:
+        bounds: A dictionary with '_southWest' and '_northEast' keys for lat/lon.
+        zoom: Tile zoom level.
+        output_path: Output GeoTIFF file path.
+
+    Returns:
+        Path to the generated GeoTIFF file.
+    """
+    # Extract bounds
+    lat0 = bounds['_southWest']['lat']
+    lon0 = bounds['_southWest']['lng']
+    lat1 = bounds['_northEast']['lat']
+    lon1 = bounds['_northEast']['lng']
+
+    # Generate the GeoTIFF
+    st.write("Generating GeoTIFF... This may take some time.")
+    try:
+        image, matrix = download_extent(
+            source = "https://services.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
+
+            lat0=lat0, lon0=lon0, lat1=lat1, lon1=lon1,
+            zoom=zoom, save_image=True
+        )
+
+        # Save the GeoTIFF temporarily or to a user-specified path
+        save_image_auto(image, output_path, matrix)
+        render_geotiff_with_context(output_path)
+        return output_path
+
+    except Exception as e:
+        st.error(f"Error generating GeoTIFF: {e}")
+        return None
+
+
+
+
+def render_geotiff_with_context(output_path):
+    """
+    Reads and plots a GeoTIFF with geographic bounds for context using Matplotlib.
+
+    Args:
+        output_path: Path to the GeoTIFF file.
+    """
+    try:
+        # Step 1: Open the GeoTIFF and read metadata
+        with rasterio.open(output_path) as src:
+            img_data = src.read(1)  # Read first band
+            bounds = src.bounds  # Get geographic bounds
+
+            # Extract bounds for plotting context
+            left, bottom, right, top = bounds
+
+            # Step 2: Plot the GeoTIFF with Matplotlib
+            fig, ax = plt.subplots(figsize=(8, 6))
+            plt.imshow(img_data, cmap="gray", extent=[left, right, bottom, top])
+
+            # Add geographic bounds as a rectangle
+            rect = patches.Rectangle(
+                (left, bottom), right - left, top - bottom,
+                linewidth=2, edgecolor="red", facecolor="none", label="GeoTIFF Bounds"
+            )
+            ax.add_patch(rect)
+
+            # Add context grid and labels
+            ax.set_title("Rendered GeoTIFF with Geographic Bounds")
+            ax.set_xlabel("Longitude")
+            ax.set_ylabel("Latitude")
+            plt.grid(visible=True)
+
+            # Step 3: Render the plot in Streamlit
+            st.pyplot(fig)
+
+    except Exception as e:
+        st.error(f"Error rendering GeoTIFF: {e}")
+
+def reproject_and_render_geotiff(output_path, target_crs="EPSG:4326"):
+    """
+    Reproject a GeoTIFF to EPSG:4326 and render it with Matplotlib.
+
+    Args:
+        output_path: Path to the original GeoTIFF file.
+        target_crs: Target CRS (default: EPSG:4326).
+    """
+    reprojected_path = output_path.replace(".tif", "_4326.tif")
+    
+    try:
+        # Step 1: Reproject the GeoTIFF
+        with rasterio.open(output_path) as src:
+            transform, width, height = calculate_default_transform(
+                src.crs, target_crs, src.width, src.height, *src.bounds
+            )
+            kwargs = src.meta.copy()
+            kwargs.update({
+                'crs': target_crs,
+                'transform': transform,
+                'width': width,
+                'height': height
+            })
+
+            with rasterio.open(reprojected_path, 'w', **kwargs) as dst:
+                for i in range(1, src.count + 1):
+                    reproject(
+                        source=rasterio.band(src, i),
+                        destination=rasterio.band(dst, i),
+                        src_transform=src.transform,
+                        src_crs=src.crs,
+                        dst_transform=transform,
+                        dst_crs=target_crs,
+                        resampling=Resampling.nearest
+                    )
+        
+        # Step 2: Plot the reprojected GeoTIFF
+        with rasterio.open(reprojected_path) as src:
+            img_data = src.read(1)  # Read first band
+            bounds = src.bounds  # Get geographic bounds
+
+            # Plot the GeoTIFF
+            fig, ax = plt.subplots(figsize=(8, 6))
+            plt.imshow(img_data, cmap="gray", extent=[bounds.left, bounds.right, bounds.bottom, bounds.top])
+            rect = patches.Rectangle(
+                (bounds.left, bounds.bottom),
+                bounds.right - bounds.left,
+                bounds.top - bounds.bottom,
+                linewidth=2, edgecolor="red", facecolor="none", label="Reprojected Bounds"
+            )
+            ax.add_patch(rect)
+
+            # Add context
+            ax.set_title("Reprojected GeoTIFF (EPSG:4326)")
+            ax.set_xlabel("Longitude")
+            ax.set_ylabel("Latitude")
+            plt.grid(visible=True)
+
+            # Render in Streamlit
+            st.pyplot(fig)
+
+    except Exception as e:
+        st.error(f"Error reprojecting and rendering GeoTIFF: {e}")
+
+def verify_geotiff(file_path):
+    """Verify that a GeoTIFF file has proper georeferencing."""
+    try:
+        with rasterio.open(file_path) as src:
+            if src.crs is None:
+                return False, "No coordinate reference system found"
+            if src.transform == rasterio.transform.IDENTITY:
+                return False, "No geotransform found"
+            return True, f"Valid GeoTIFF with CRS: {src.crs}, Transform: {src.transform}"
+    except Exception as e:
+        return False, f"Error reading GeoTIFF: {str(e)}"
+
+# streamlit app ui
 
 st.title("Pole Detection")
 
@@ -179,24 +353,47 @@ else:
 if "geotiff_path" not in st.session_state:
     st.session_state.geotiff_path = None
 
-# Step 1: Download GeoTIFF
+# Download GeoTIFF using tms2geotiff
 if st.button("Download GeoTIFF"):
-    if st_data and "bounds" in st_data:
-        st.write("Downloading GeoTIFF for the current extent...")
-        bounds = st_data["bounds"]
-        timestamp = datetime.now().strftime("%Y%m%d%H%M%S")
-        geotiff_path = download_esri_geotiff(bounds, output_path=f"high_res_extent_{timestamp}.tif")
+    if bounds:
+        # Create a temporary file for the GeoTIFF
+        with tempfile.NamedTemporaryFile(suffix=".tif", delete=False) as temp_file:
+            output_path = temp_file.name
         
-        if geotiff_path:
-            st.session_state.geotiff_path = geotiff_path  # Save path in session state
-            st.success(f"GeoTIFF downloaded: {geotiff_path}")
-            file_size = os.path.getsize(geotiff_path) / (1024 * 1024)
+        # Call the wrapper function
+        tms_geotiff_path = tms_download(bounds, zoom=17, output_path=output_path)
+        
+        # Update the Streamlit session state
+        if tms_geotiff_path:
+            st.session_state.geotiff_path = tms_geotiff_path
+            # Verify georeferencing
+            is_valid, message = verify_geotiff(tms_geotiff_path)
+            if is_valid:
+                st.success(f"GeoTIFF downloaded and properly georeferenced: {message}")
+            else:
+                st.warning(f"GeoTIFF downloaded but georeferencing issue detected: {message}")
+            
+            file_size = os.path.getsize(tms_geotiff_path) / (1024 * 1024)
             st.write(f"GeoTIFF size: {file_size:.2f} MB")
         else:
             st.error("Failed to download GeoTIFF.")
     else:
-        st.warning("Please drag the map to specify an area of interest.")
+        st.warning("Please specify a valid map area of interest.")
 
+if st.button("Reproject and Show GeoTIFF"):
+    if bounds:
+        output_path = "high_res_extent.tif"
+        tms_geotiff_path = tms_download(bounds, zoom=17, output_path=output_path)
+
+        if tms_geotiff_path:
+            st.success("GeoTIFF downloaded successfully!")
+            reproject_and_render_geotiff(tms_geotiff_path)
+        else:
+            st.error("Failed to download GeoTIFF.")
+    else:
+        st.warning("Please specify a valid map area of interest.")
+
+        
 # Run Detection on Button Click
 if st.button("Run Detection"):
     if st.session_state.geotiff_path:
@@ -214,3 +411,4 @@ if st.button("Run Detection"):
         st.image(result_img, caption="Detected Poles", use_container_width=True)
     else:
         st.warning("No GeoTIFF found. Please download it first.")
+
