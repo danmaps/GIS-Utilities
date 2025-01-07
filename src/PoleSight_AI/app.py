@@ -12,7 +12,10 @@ import warnings
 import os
 from owslib.wms import WebMapService
 import rasterio
-# from datetime import datetime
+import numpy as np
+import torch
+import supervision as sv
+from groundingdino.util.inference import Model
 
 import matplotlib.pyplot as plt
 import matplotlib.patches as patches
@@ -399,16 +402,78 @@ if st.button("Run Detection"):
     if st.session_state.geotiff_path:
         st.write("Running detection...")
         
+        # Add text prompt input
+        text_prompt = st.text_input("Enter detection prompt:", 
+                                  value="wooden utility pole or power pole or telephone pole",
+                                  help="Describe what you want to detect")
+        
+        confidence_threshold = st.slider("Confidence Threshold", 
+                                      min_value=0.0, 
+                                      max_value=1.0, 
+                                      value=0.35)
+        
         # Process the saved GeoTIFF path
         temp_image_path = st.session_state.geotiff_path
         
-        # Run detection
-        poles = detect_poles(temp_image_path)
-        st.write(f"Detected {len(poles)} poles.")
-
-        # Draw bounding boxes
-        result_img = draw_bounding_boxes(temp_image_path, poles)
-        st.image(result_img, caption="Detected Poles", use_container_width=True)
+        # Run detection with text prompt
+        detections = detect_with_prompt(
+            temp_image_path, 
+            text_prompt=text_prompt,
+            box_threshold=confidence_threshold
+        )
+        
+        if len(detections) > 0:
+            st.write(f"Detected {len(detections)} objects matching '{text_prompt}'")
+            
+            # Draw detections
+            result_img = draw_detections(temp_image_path, detections)
+            st.image(result_img, caption=f"Detected {text_prompt}", use_container_width=True)
+        else:
+            st.warning(f"No objects matching '{text_prompt}' were detected. Try adjusting the confidence threshold or modifying the prompt.")
     else:
         st.warning("No GeoTIFF found. Please download it first.")
+
+@st.cache_resource
+def load_grounding_dino():
+    model = Model(model_config_path="GroundingDINO/groundingdino/config/GroundingDINO_SwinT_OGC.py",
+                 model_checkpoint_path="groundingdino_swint_ogc.pth")
+    return model
+
+# Function to detect objects with text prompt
+def detect_with_prompt(image_path, text_prompt="wooden utility pole", box_threshold=0.35, text_threshold=0.25):
+    model = load_grounding_dino()
+    
+    # Read image
+    image = cv2.imread(image_path)
+    image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
+    
+    # Detect objects
+    detections = model.predict_with_classes(
+        image=image,
+        classes=[text_prompt],
+        box_threshold=box_threshold,
+        text_threshold=text_threshold
+    )
+    
+    return detections
+
+def draw_detections(image_path, detections):
+    image = cv2.imread(image_path)
+    image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
+    
+    # Create annotator
+    box_annotator = sv.BoxAnnotator()
+    
+    # Prepare labels
+    labels = [f"{detection.class_id}: {detection.confidence:.2f}" 
+              for detection in detections]
+    
+    # Draw boxes
+    annotated_image = box_annotator.annotate(
+        scene=image, 
+        detections=detections,
+        labels=labels
+    )
+    
+    return annotated_image
 
