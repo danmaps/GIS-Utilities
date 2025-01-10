@@ -153,7 +153,7 @@ def download_esri_geotiff(bounds, size=(2048, 2048), output_path="high_res_exten
         return output_path
     else:
         raise Exception(f"Failed to download GeoTIFF. Status: {response.status_code}")
-
+    
 def tms_download(bounds, zoom=17, output_path="high_res_extent.tif"):
     """
     Wrapper around tms2geotiff.download_extent to fetch a georeferenced GeoTIFF.
@@ -320,6 +320,60 @@ def verify_geotiff(file_path):
     except Exception as e:
         return False, f"Error reading GeoTIFF: {str(e)}"
 
+def add_geotiff_to_map(m, geotiff_path):
+    """
+    Add a GeoTIFF overlay to a Folium map.
+    
+    Args:
+        m: Folium map object
+        geotiff_path: Path to the GeoTIFF file
+    """
+    try:
+        with rasterio.open(geotiff_path) as src:
+            # Get bounds
+            bounds = src.bounds
+            # Read the data
+            data = src.read()
+            
+            # Handle RGB vs single band
+            if data.shape[0] >= 3:  # RGB image
+                # Combine the first three bands and transpose to correct shape
+                rgb_data = np.dstack((data[0], data[1], data[2]))
+                img = Image.fromarray(rgb_data.astype(np.uint8))
+            else:  # Single band
+                img = Image.fromarray(data[0].astype(np.uint8))
+            
+            # Create a temporary PNG file for the overlay
+            temp_png = "temp_overlay.png"
+            img.save(temp_png)
+            
+            # Add the image overlay to the map
+            image_overlay = folium.raster_layers.ImageOverlay(
+                image=temp_png,
+                bounds=[[bounds.bottom, bounds.left], [bounds.top, bounds.right]],
+                opacity=0.7,
+                name="GeoTIFF Overlay",
+                interactive=True,
+                cross_origin=False,
+                zindex=1
+            )
+            image_overlay.add_to(m)
+            
+            # Add layer control if it doesn't exist
+            if not any(isinstance(child, folium.LayerControl) for child in m._children.values()):
+                folium.LayerControl().add_to(m)
+            
+            # Clean up temporary file
+            os.remove(temp_png)
+            
+            # Fit map to GeoTIFF bounds
+            m.fit_bounds([[bounds.bottom, bounds.left], [bounds.top, bounds.right]])
+            
+            return True
+    except Exception as e:
+        st.error(f"Error adding GeoTIFF to map: {e}")
+        return False
+
 # streamlit app ui
 
 st.title("Pole Detection")
@@ -337,6 +391,10 @@ tile_layer = folium.TileLayer(
     overlay=False,
     control=True
 ).add_to(m)
+
+# Add GeoTIFF overlay if it exists in session state
+if "geotiff_path" in st.session_state and st.session_state.geotiff_path:
+    add_geotiff_to_map(m, st.session_state.geotiff_path)
 
 # Retrieve map bounds for ROI
 st_data = st_folium(m, width=700, height=500)
